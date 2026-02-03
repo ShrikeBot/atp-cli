@@ -75,9 +75,9 @@ const command = new Command('publish')
         ? 'https://blockstream.info/testnet/api'
         : 'https://blockstream.info/api';
       
-      // Create the OP_RETURN data
-      const gpgPrefix = identity.gpg.fingerprint.slice(0, 16);
-      const opReturnData = `ATP:0.4:id:${gpgPrefix}`;
+      // Create the OP_RETURN data (full fingerprint per ATP-RFC-0001)
+      const fingerprint = identity.gpg.fingerprint;
+      const opReturnData = `ATP:0.4:id:${fingerprint}`;
       const opReturnBuffer = Buffer.from(opReturnData);
       
       console.log('\n=== ATP Identity Publication ===\n');
@@ -136,7 +136,7 @@ const command = new Command('publish')
         index: utxo.vout,
         witnessUtxo: {
           script: bitcoin.address.toOutputScript(identity.wallet.address, network),
-          value: utxo.value
+          value: BigInt(utxo.value)
         }
       });
       
@@ -149,7 +149,7 @@ const command = new Command('publish')
       const embed = bitcoin.payments.embed({ data: [opReturnBuffer] });
       psbt.addOutput({
         script: embed.output,
-        value: 0
+        value: BigInt(0)
       });
       
       // Add change output
@@ -161,7 +161,7 @@ const command = new Command('publish')
       
       psbt.addOutput({
         address: identity.wallet.address,
-        value: change
+        value: BigInt(change)
       });
       
       console.log('Fee:', fee, 'sats');
