@@ -16,7 +16,8 @@ program
   .description('Manage agent identities')
   .addCommand(require('./commands/identity-create'))
   .addCommand(require('./commands/identity-verify'))
-  .addCommand(require('./commands/identity-show'));
+  .addCommand(require('./commands/identity-show'))
+  .addCommand(require('./commands/identity-publish'));
 
 // Future: attestation commands
 // program.command('attestation')...
