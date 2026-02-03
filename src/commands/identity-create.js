@@ -15,6 +15,7 @@ const command = new Command('create')
   .option('--github <handle>', 'GitHub handle')
   .option('--wallet-sig <signature>', 'Pre-signed wallet proof (if already signed)')
   .option('-o, --output <file>', 'Output file (default: stdout)')
+  .option('-t, --timestamp <unix>', 'Unix timestamp (default: now)')
   .action(async (options) => {
     try {
       const identity = await createIdentity(options);
@@ -34,7 +35,7 @@ const command = new Command('create')
   });
 
 async function createIdentity(options) {
-  const timestamp = Math.floor(Date.now() / 1000);
+  const timestamp = options.timestamp ? parseInt(options.timestamp) : Math.floor(Date.now() / 1000);
   
   // Build platforms object
   const platforms = {};
