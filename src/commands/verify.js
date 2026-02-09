@@ -78,6 +78,15 @@ const verifyCmd = new Command('verify')
     } else if (doc.t === 'revoke') {
       console.log(`Revocation of ${doc.subject.f}`);
       console.log(`Reason: ${doc.reason}`);
+    } else if (doc.t === 'att-revoke') {
+      console.log(`Attestation revocation`);
+      console.log(`Ref: ${doc.ref}`);
+      console.log(`Reason: ${doc.reason}`);
+      console.log('To verify, confirm the signature matches the original attestor\'s key.');
+    } else if (doc.t === 'hb') {
+      console.log(`Heartbeat from ${doc.f}`);
+      if (doc.msg) console.log(`Message: ${doc.msg}`);
+      console.log('To verify, confirm the signature matches the identity with this fingerprint.');
     } else {
       console.error(`Unknown document type: ${doc.t}`);
     }
