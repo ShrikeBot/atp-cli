@@ -1,28 +1,25 @@
 #!/usr/bin/env node
 
-const { Command } = require('commander');
-const pkg = require('../package.json');
+import { Command } from 'commander';
+import identity from './commands/identity.js';
+import verifyCmd from './commands/verify.js';
+import supersede from './commands/supersede.js';
+import revoke from './commands/revoke.js';
+import attest from './commands/attest.js';
+import receipt from './commands/receipt.js';
 
 const program = new Command();
 
 program
   .name('atp')
-  .description('Agent Trust Protocol CLI - identity, attestations, receipts')
-  .version(pkg.version);
+  .version('1.0.0')
+  .description('Agent Trust Protocol CLI — identity, attestations, receipts, inscriptions');
 
-// Identity commands
-program
-  .command('identity')
-  .description('Manage agent identities')
-  .addCommand(require('./commands/identity-create'))
-  .addCommand(require('./commands/identity-verify'))
-  .addCommand(require('./commands/identity-show'))
-  .addCommand(require('./commands/identity-publish'));
-
-// Future: attestation commands
-// program.command('attestation')...
-
-// Future: receipt commands  
-// program.command('receipt')...
+program.addCommand(identity);
+program.addCommand(verifyCmd);
+program.addCommand(supersede);
+program.addCommand(revoke);
+program.addCommand(attest);
+program.addCommand(receipt);
 
 program.parse();

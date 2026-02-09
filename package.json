@@ -1,23 +1,17 @@
 {
   "name": "atp-cli",
-  "version": "0.4.0",
-  "description": "CLI for Agent Trust Protocol - identity, attestations, receipts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CLI for Agent Trust Protocol v1.0 — identity, attestations, receipts, inscriptions",
   "main": "src/index.js",
   "bin": {
     "atp": "./src/index.js"
   },
   "scripts": {
-    "test": "node test/run.js",
+    "test": "node --test src/**/*.test.js",
     "atp": "node src/index.js"
   },
-  "keywords": [
-    "atp",
-    "agent",
-    "trust",
-    "protocol",
-    "bitcoin",
-    "gpg"
-  ],
+  "keywords": ["atp", "agent", "trust", "protocol", "bitcoin", "ed25519", "inscription"],
   "author": "Shrike (@ShrikeBot)",
   "license": "MIT",
   "repository": {
@@ -25,8 +19,8 @@
     "url": "https://github.com/ShrikeBot/atp-cli"
   },
   "dependencies": {
-    "bitcoinjs-message": "^2.2.0",
-    "commander": "^14.0.3",
-    "uuid": "^13.0.0"
+    "@noble/curves": "^1.8.0",
+    "cbor-x": "^1.6.0",
+    "commander": "^14.0.3"
   }
 }

@@ -1,0 +1,59 @@
+import { Command } from 'commander';
+import { readFile, writeFile } from 'node:fs/promises';
+import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
+import { sign } from '../lib/signing.js';
+import { computeFingerprint } from '../lib/fingerprint.js';
+import { loadPrivateKeyByFile } from '../lib/keys.js';
+
+const supersede = new Command('supersede')
+  .description('Create a supersession document (key rotation)')
+  .requiredOption('--old <file>', 'Old identity file')
+  .requiredOption('--new <file>', 'New identity file')
+  .requiredOption('--reason <reason>', 'Reason: key-rotation, algorithm-upgrade, key-compromised')
+  .option('--old-txid <txid>', 'Old identity inscription TXID')
+  .option('--new-txid <txid>', 'New identity inscription TXID')
+  .option('--encoding <format>', 'json or cbor', 'json')
+  .option('--output <file>', 'Output file')
+  .action(async (opts) => {
+    const oldDoc = JSON.parse(await readFile(opts.old, 'utf8'));
+    const newDoc = JSON.parse(await readFile(opts.new, 'utf8'));
+
+    const oldK = Array.isArray(oldDoc.k) ? oldDoc.k[0] : oldDoc.k;
+    const newK = Array.isArray(newDoc.k) ? newDoc.k[0] : newDoc.k;
+
+    const oldPub = fromBase64url(oldK.p);
+    const newPub = fromBase64url(newK.p);
+    const oldFp = computeFingerprint(oldPub, oldK.t);
+    const newFp = computeFingerprint(newPub, newK.t);
+
+    const doc = {
+      v: '1.0',
+      t: 'super',
+      old: { t: oldK.t, f: oldFp, ...(opts.oldTxid && { txid: opts.oldTxid }) },
+      new: { t: newK.t, f: newFp, ...(opts.newTxid && { txid: opts.newTxid }) },
+      reason: opts.reason,
+      c: Math.floor(Date.now() / 1000),
+    };
+
+    // Sign with both keys
+    const oldKey = await loadPrivateKeyByFile(opts.old);
+    const newKey = await loadPrivateKeyByFile(opts.new);
+
+    const format = opts.encoding;
+    const oldSig = sign(doc, oldKey.privateKey, format);
+    const newSig = sign(doc, newKey.privateKey, format);
+
+    doc.s = format === 'cbor'
+      ? [oldSig, newSig]
+      : [toBase64url(oldSig), toBase64url(newSig)];
+
+    const output = encodeDocument(doc, format);
+    if (opts.output) {
+      await writeFile(opts.output, output);
+      console.error(`Supersession written to: ${opts.output}`);
+    } else {
+      console.log(format === 'cbor' ? output.toString('hex') : output.toString('utf8'));
+    }
+  });
+
+export default supersede;
