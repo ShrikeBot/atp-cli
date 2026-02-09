@@ -2,12 +2,15 @@ import { request } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 
 export class BitcoinRPC {
-  constructor(url, user, pass) {
+  private url: URL;
+  private auth: string;
+
+  constructor(url: string, user: string, pass: string) {
     this.url = new URL(url);
     this.auth = Buffer.from(`${user}:${pass}`).toString('base64');
   }
 
-  async call(method, params = []) {
+  async call(method: string, params: unknown[] = []): Promise<unknown> {
     const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
     const reqFn = this.url.protocol === 'https:' ? httpsRequest : request;
 
@@ -20,7 +23,7 @@ export class BitcoinRPC {
         },
       }, (res) => {
         let data = '';
-        res.on('data', (chunk) => data += chunk);
+        res.on('data', (chunk: string) => data += chunk);
         res.on('end', () => {
           try {
             const json = JSON.parse(data);
@@ -35,11 +38,11 @@ export class BitcoinRPC {
     });
   }
 
-  async getRawTransaction(txid, verbose = true) {
+  async getRawTransaction(txid: string, verbose = true): Promise<unknown> {
     return this.call('getrawtransaction', [txid, verbose]);
   }
 
-  async sendRawTransaction(hex) {
+  async sendRawTransaction(hex: string): Promise<unknown> {
     return this.call('sendrawtransaction', [hex]);
   }
 }

@@ -10,6 +10,9 @@ import attRevoke from './commands/att-revoke.js';
 import heartbeat from './commands/heartbeat.js';
 import receipt from './commands/receipt.js';
 
+// Re-export schemas for library consumers
+export * from './schemas/index.js';
+
 const program = new Command();
 
 program

@@ -3,10 +3,10 @@ import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { generateKeypair } from '../lib/keys.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { toBase64url, fromBase64url, encodeDocument, jsonCanonical, cborEncode } from '../lib/encoding.js';
+import { toBase64url, fromBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { buildInscriptionEnvelope } from '../lib/inscription.js';
-import { BitcoinRPC } from '../lib/rpc.js';
+import { IdentityUnsignedSchema } from '../schemas/index.js';
 
 const identity = new Command('identity').description('Identity management');
 
@@ -22,36 +22,36 @@ identity
   .option('--wallet <address>', 'Bitcoin payment address')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
-  .action(async (opts) => {
-    const { privateKey, publicKey, fingerprint, keyFile } = await generateKeypair(opts.key);
+  .action(async (opts: Record<string, string | undefined>) => {
+    const { privateKey, publicKey, fingerprint, keyFile } = await generateKeypair(opts.key ?? 'ed25519');
     console.error(`Key generated. Fingerprint: ${fingerprint}`);
     console.error(`Private key saved to: ${keyFile}`);
 
-    const doc = {
+    const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'id',
       n: opts.name,
       k: {
-        t: opts.key,
+        t: opts.key ?? 'ed25519',
         p: toBase64url(publicKey),
       },
       c: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c, 'Identity');
+    validateTimestamp(doc.c as number, 'Identity');
 
-    // Optional wallet
     if (opts.wallet) doc.w = opts.wallet;
 
-    // Optional metadata (handles)
-    const meta = {};
+    const meta: Record<string, string> = {};
     if (opts.handleTwitter) meta.twitter = opts.handleTwitter;
     if (opts.handleMoltbook) meta.moltbook = opts.handleMoltbook;
     if (opts.handleGithub) meta.github = opts.handleGithub;
     if (opts.handleNostr) meta.nostr = opts.handleNostr;
     if (Object.keys(meta).length > 0) doc.m = meta;
 
-    // Sign
-    const format = opts.encoding;
+    // Validate before signing
+    IdentityUnsignedSchema.parse(doc);
+
+    const format = opts.encoding ?? 'json';
     const sig = sign(doc, privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);
 
@@ -73,7 +73,7 @@ identity
   .command('show')
   .description('Display identity from file')
   .argument('<file>', 'Identity file path')
-  .action(async (file) => {
+  .action(async (file: string) => {
     const raw = await readFile(file, 'utf8');
     const doc = JSON.parse(raw);
 
@@ -93,7 +93,7 @@ identity
     if (doc.w) console.log(`Wallet:      ${doc.w}`);
     if (doc.m) {
       console.log(`Handles:`);
-      for (const [platform, handle] of Object.entries(doc.m)) {
+      for (const [platform, handle] of Object.entries(doc.m as Record<string, string>)) {
         console.log(`  ${platform}: ${handle}`);
       }
     }
@@ -110,11 +110,10 @@ identity
   .option('--rpc-url <url>', 'Bitcoin RPC URL', 'http://localhost:8332')
   .option('--rpc-user <user>', 'RPC username', 'bitcoin')
   .option('--rpc-pass <pass>', 'RPC password', '')
-  .action(async (opts) => {
-    const raw = await readFile(opts.file);
-    let contentType, data;
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    const raw = await readFile(opts.file as string);
+    let contentType: string, data: Buffer;
 
-    // Detect format
     try {
       JSON.parse(raw.toString('utf8'));
       contentType = 'application/atp.v1+json';

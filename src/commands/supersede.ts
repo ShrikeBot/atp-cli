@@ -5,6 +5,7 @@ import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { SupersessionUnsignedSchema } from '../schemas/index.js';
 
 const supersede = new Command('supersede')
   .description('Create a supersession document (key rotation)')
@@ -15,9 +16,9 @@ const supersede = new Command('supersede')
   .option('--new-txid <txid>', 'New identity inscription TXID')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
-  .action(async (opts) => {
-    const oldDoc = JSON.parse(await readFile(opts.old, 'utf8'));
-    const newDoc = JSON.parse(await readFile(opts.new, 'utf8'));
+  .action(async (opts: Record<string, string | undefined>) => {
+    const oldDoc = JSON.parse(await readFile(opts.old!, 'utf8'));
+    const newDoc = JSON.parse(await readFile(opts.new!, 'utf8'));
 
     const oldK = Array.isArray(oldDoc.k) ? oldDoc.k[0] : oldDoc.k;
     const newK = Array.isArray(newDoc.k) ? newDoc.k[0] : newDoc.k;
@@ -27,7 +28,7 @@ const supersede = new Command('supersede')
     const oldFp = computeFingerprint(oldPub, oldK.t);
     const newFp = computeFingerprint(newPub, newK.t);
 
-    const doc = {
+    const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'super',
       old: { t: oldK.t, f: oldFp, ...(opts.oldTxid && { txid: opts.oldTxid }) },
@@ -35,13 +36,15 @@ const supersede = new Command('supersede')
       reason: opts.reason,
       c: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c, 'Supersession');
+    validateTimestamp(doc.c as number, 'Supersession');
 
-    // Sign with both keys
-    const oldKey = await loadPrivateKeyByFile(opts.old);
-    const newKey = await loadPrivateKeyByFile(opts.new);
+    // Validate before signing
+    SupersessionUnsignedSchema.parse(doc);
 
-    const format = opts.encoding;
+    const oldKey = await loadPrivateKeyByFile(opts.old!);
+    const newKey = await loadPrivateKeyByFile(opts.new!);
+
+    const format = opts.encoding ?? 'json';
     const oldSig = sign(doc, oldKey.privateKey, format);
     const newSig = sign(doc, newKey.privateKey, format);
 

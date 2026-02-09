@@ -3,13 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "description": "CLI for Agent Trust Protocol v1.0 — identity, attestations, receipts, inscriptions",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "atp": "./src/index.js"
+    "atp": "./dist/index.js"
   },
   "scripts": {
-    "test": "node --test src/**/*.test.js",
-    "atp": "node src/index.js"
+    "build": "tsc",
+    "atp": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": ["atp", "agent", "trust", "protocol", "bitcoin", "ed25519", "inscription"],
   "author": "Shrike (@ShrikeBot)",
@@ -21,6 +23,11 @@
   "dependencies": {
     "@noble/curves": "^1.8.0",
     "cbor-x": "^1.6.0",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "typescript": "^5.8.3"
   }
 }
