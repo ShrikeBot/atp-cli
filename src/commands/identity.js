@@ -1,3 +1,4 @@
+import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { generateKeypair } from '../lib/keys.js';
@@ -36,6 +37,7 @@ identity
       },
       c: Math.floor(Date.now() / 1000),
     };
+    validateTimestamp(doc.c, 'Identity');
 
     // Optional wallet
     if (opts.wallet) doc.w = opts.wallet;
@@ -115,10 +117,10 @@ identity
     // Detect format
     try {
       JSON.parse(raw.toString('utf8'));
-      contentType = 'application/json';
+      contentType = 'application/atp.v1+json';
       data = raw;
     } catch {
-      contentType = 'application/cbor';
+      contentType = 'application/atp.v1+cbor';
       data = raw;
     }
 

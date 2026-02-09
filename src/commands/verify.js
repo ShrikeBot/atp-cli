@@ -5,6 +5,7 @@ import { verify } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { BitcoinRPC } from '../lib/rpc.js';
 import { extractInscriptionFromWitness } from '../lib/inscription.js';
+import { validateTimestamp } from '../lib/timestamp.js';
 
 const verifyCmd = new Command('verify')
   .description('Verify an ATP document from file or TXID')
@@ -44,6 +45,14 @@ const verifyCmd = new Command('verify')
     if (doc.v !== '1.0') {
       console.error(`Unsupported version: ${doc.v}`);
       process.exit(1);
+    }
+
+    // Validate timestamp
+    try {
+      validateTimestamp(doc.c, 'Document');
+      console.log(`Timestamp: ${new Date(doc.c * 1000).toISOString()} ✓`);
+    } catch (e) {
+      console.warn(`⚠ ${e.message}`);
     }
 
     console.log(`Document type: ${doc.t}`);

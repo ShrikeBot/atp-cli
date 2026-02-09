@@ -1,3 +1,4 @@
+import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
@@ -34,6 +35,7 @@ const supersede = new Command('supersede')
       reason: opts.reason,
       c: Math.floor(Date.now() / 1000),
     };
+    validateTimestamp(doc.c, 'Supersession');
 
     // Sign with both keys
     const oldKey = await loadPrivateKeyByFile(opts.old);

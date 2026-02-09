@@ -1,3 +1,4 @@
+import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
@@ -28,6 +29,7 @@ const attest = new Command('attest')
       to: { t: opts.toKeyType, f: fingerprint },
       c: Math.floor(Date.now() / 1000),
     };
+    validateTimestamp(doc.c, 'Attestation');
 
     if (opts.stake) doc.stake = opts.stake;
     if (opts.context) doc.ctx = opts.context;

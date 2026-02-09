@@ -1,3 +1,4 @@
+import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
@@ -40,6 +41,7 @@ receipt
       out: opts.outcome,
       c: Math.floor(Date.now() / 1000),
     };
+    validateTimestamp(doc.c, 'Receipt');
 
     // Sign with our key (counterparty signs separately)
     const key = await loadPrivateKeyByFile(opts.from);

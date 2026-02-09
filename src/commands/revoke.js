@@ -1,3 +1,4 @@
+import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
@@ -25,6 +26,7 @@ const revoke = new Command('revoke')
       reason: opts.reason,
       c: Math.floor(Date.now() / 1000),
     };
+    validateTimestamp(doc.c, 'Revocation');
 
     const key = await loadPrivateKeyByFile(opts.identity);
     const format = opts.encoding;
