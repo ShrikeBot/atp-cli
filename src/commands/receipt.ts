@@ -51,9 +51,10 @@ receipt
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, key.privateKey, format);
 
-    doc.s = format === 'cbor'
-      ? [sig, Buffer.alloc(0)]
-      : [toBase64url(sig), '<awaiting-counterparty-signature>'];
+    doc.s =
+      format === 'cbor'
+        ? [sig, Buffer.alloc(0)]
+        : [toBase64url(sig), '<awaiting-counterparty-signature>'];
 
     const output = encodeDocument(doc, format);
     if (opts.output) {

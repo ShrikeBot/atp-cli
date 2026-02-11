@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, PartySchema, ExchangeSchema, SignatureSchema } from './common.js';
+import {
+  VersionSchema,
+  TimestampSchema,
+  PartySchema,
+  ExchangeSchema,
+  SignatureSchema,
+} from './common.js';
 
 export const ReceiptSchema = z.object({
   v: VersionSchema,

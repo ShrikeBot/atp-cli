@@ -27,7 +27,7 @@ export function buildInscriptionEnvelope(data: Buffer, contentType: string): Buf
     Buffer.from([OP_FALSE, OP_IF]),
     Buffer.from([OP_PUSH_3]),
     Buffer.from('ord', 'ascii'),
-    Buffer.from([0x01, 0x01]),
+    Buffer.from([0x01]),
     pushData(Buffer.from(contentType, 'ascii')),
     Buffer.from([OP_FALSE]),
   ];
@@ -44,7 +44,10 @@ export function buildInscriptionEnvelope(data: Buffer, contentType: string): Buf
   return Buffer.concat(parts);
 }
 
-export function extractInscriptionFromWitness(witnessHex: string): { contentType: string; data: Buffer } {
+export function extractInscriptionFromWitness(witnessHex: string): {
+  contentType: string;
+  data: Buffer;
+} {
   const buf = Buffer.from(witnessHex, 'hex');
   const ordIdx = buf.indexOf(Buffer.from('ord', 'ascii'));
   if (ordIdx === -1) throw new Error('No inscription found in witness');
@@ -54,7 +57,8 @@ export function extractInscriptionFromWitness(witnessHex: string): { contentType
   if (buf[pos] !== 0x01) throw new Error('Expected content-type tag');
   pos++;
 
-  const ctLen = buf[pos]!; pos++;
+  const ctLen = buf[pos]!;
+  pos++;
   const contentType = buf.subarray(pos, pos + ctLen).toString('ascii');
   pos += ctLen;
 
@@ -63,7 +67,10 @@ export function extractInscriptionFromWitness(witnessHex: string): { contentType
 
   const dataChunks: Buffer[] = [];
   while (pos < buf.length && buf[pos] !== 0x68) {
-    if (buf[pos] === 0x00) { pos++; continue; }
+    if (buf[pos] === 0x00) {
+      pos++;
+      continue;
+    }
     const len = buf[pos]!;
     if (len <= 75) {
       pos++;
@@ -71,12 +78,14 @@ export function extractInscriptionFromWitness(witnessHex: string): { contentType
       pos += len;
     } else if (len === 0x4c) {
       pos++;
-      const dlen = buf[pos]!; pos++;
+      const dlen = buf[pos]!;
+      pos++;
       dataChunks.push(buf.subarray(pos, pos + dlen));
       pos += dlen;
     } else if (len === 0x4d) {
       pos++;
-      const dlen = buf[pos]! | (buf[pos + 1]! << 8); pos += 2;
+      const dlen = buf[pos]! | (buf[pos + 1]! << 8);
+      pos += 2;
       dataChunks.push(buf.subarray(pos, pos + dlen));
       pos += dlen;
     } else {

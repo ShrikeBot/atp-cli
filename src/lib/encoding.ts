@@ -34,7 +34,7 @@ export { cborDecode };
 
 /** Encode document for signing (without `s` field) */
 export function encodeForSigning(doc: Record<string, unknown>, format = 'json'): Buffer {
-  const { s, ...unsigned } = doc;
+  const { s: _sig, ...unsigned } = doc;
   return format === 'cbor' ? cborEncode(unsigned) : jsonCanonical(unsigned);
 }
 

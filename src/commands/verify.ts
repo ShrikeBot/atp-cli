@@ -20,7 +20,9 @@ const verifyCmd = new Command('verify')
 
     if (/^[0-9a-f]{64}$/i.test(source)) {
       const rpc = new BitcoinRPC(opts.rpcUrl, opts.rpcUser, opts.rpcPass);
-      const tx = await rpc.getRawTransaction(source) as { vin: Array<{ txinwitness?: string[] }> };
+      const tx = (await rpc.getRawTransaction(source)) as {
+        vin: Array<{ txinwitness?: string[] }>;
+      };
       const witness = tx.vin[0]?.txinwitness;
       if (!witness || witness.length === 0) {
         console.error('No witness data found in transaction');
@@ -40,7 +42,7 @@ const verifyCmd = new Command('verify')
     }
 
     // Validate against schema
-    const parsed = AtpDocumentSchema.parse(doc);
+    AtpDocumentSchema.parse(doc);
     console.log(`Schema validation: ✓`);
 
     if (doc.v !== '1.0') {
@@ -69,12 +71,18 @@ const verifyCmd = new Command('verify')
         console.log(`Key ${i} (${k[i].t}, ${fp}): ${valid ? '✓ VALID' : '✗ INVALID'}`);
       }
     } else if (doc.t === 'att') {
-      console.log(`Attestation from ${(doc.from as { f: string }).f} to ${(doc.to as { f: string }).f}`);
-      console.log('To verify, provide the attestor\'s public key via their identity document.');
+      console.log(
+        `Attestation from ${(doc.from as { f: string }).f} to ${(doc.to as { f: string }).f}`,
+      );
+      console.log("To verify, provide the attestor's public key via their identity document.");
     } else if (doc.t === 'super') {
-      console.log(`Supersession: ${(doc.old as { f: string }).f} → ${(doc.new as { f: string }).f}`);
+      console.log(
+        `Supersession: ${(doc.old as { f: string }).f} → ${(doc.new as { f: string }).f}`,
+      );
       console.log(`Reason: ${doc.reason}`);
-      console.log('Both old and new key signatures must be verified against their identity documents.');
+      console.log(
+        'Both old and new key signatures must be verified against their identity documents.',
+      );
     } else if (doc.t === 'revoke') {
       console.log(`Revocation of ${(doc.subject as { f: string }).f}`);
       console.log(`Reason: ${doc.reason}`);
@@ -82,7 +90,7 @@ const verifyCmd = new Command('verify')
       console.log(`Attestation revocation`);
       console.log(`Ref: ${doc.ref}`);
       console.log(`Reason: ${doc.reason}`);
-      console.log('To verify, confirm the signature matches the original attestor\'s key.');
+      console.log("To verify, confirm the signature matches the original attestor's key.");
     } else if (doc.t === 'hb') {
       console.log(`Heartbeat from ${doc.f}`);
       if (doc.msg) console.log(`Message: ${doc.msg}`);

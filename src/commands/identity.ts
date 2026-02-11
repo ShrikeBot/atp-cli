@@ -23,7 +23,9 @@ identity
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
   .action(async (opts: Record<string, string | undefined>) => {
-    const { privateKey, publicKey, fingerprint, keyFile } = await generateKeypair(opts.key ?? 'ed25519');
+    const { privateKey, publicKey, fingerprint, keyFile } = await generateKeypair(
+      opts.key ?? 'ed25519',
+    );
     console.error(`Key generated. Fingerprint: ${fingerprint}`);
     console.error(`Private key saved to: ${keyFile}`);
 
@@ -98,7 +100,9 @@ identity
       }
     }
     console.log(`Created:     ${new Date(doc.c * 1000).toISOString()}`);
-    console.log(`Signature:   ${typeof doc.s === 'string' ? doc.s.slice(0, 32) + '...' : '(binary)'}`);
+    console.log(
+      `Signature:   ${typeof doc.s === 'string' ? doc.s.slice(0, 32) + '...' : '(binary)'}`,
+    );
   });
 
 identity

@@ -15,23 +15,29 @@ export class BitcoinRPC {
     const reqFn = this.url.protocol === 'https:' ? httpsRequest : request;
 
     return new Promise((resolve, reject) => {
-      const req = reqFn(this.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${this.auth}`,
+      const req = reqFn(
+        this.url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Basic ${this.auth}`,
+          },
         },
-      }, (res) => {
-        let data = '';
-        res.on('data', (chunk: string) => data += chunk);
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            if (json.error) reject(new Error(json.error.message));
-            else resolve(json.result);
-          } catch (e) { reject(e); }
-        });
-      });
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: string) => (data += chunk));
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              if (json.error) reject(new Error(json.error.message));
+              else resolve(json.result);
+            } catch (e) {
+              reject(e);
+            }
+          });
+        },
+      );
       req.on('error', reject);
       req.write(body);
       req.end();

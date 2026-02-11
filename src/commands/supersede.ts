@@ -48,9 +48,7 @@ const supersede = new Command('supersede')
     const oldSig = sign(doc, oldKey.privateKey, format);
     const newSig = sign(doc, newKey.privateKey, format);
 
-    doc.s = format === 'cbor'
-      ? [oldSig, newSig]
-      : [toBase64url(oldSig), toBase64url(newSig)];
+    doc.s = format === 'cbor' ? [oldSig, newSig] : [toBase64url(oldSig), toBase64url(newSig)];
 
     const output = encodeDocument(doc, format);
     if (opts.output) {

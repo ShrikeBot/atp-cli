@@ -32,7 +32,9 @@ export function generateEd25519(): { privateKey: Buffer; publicKey: Buffer } {
   return { privateKey: Buffer.from(privBytes), publicKey: Buffer.from(pubBytes) };
 }
 
-export async function generateKeypair(keyType = 'ed25519'): Promise<{ privateKey: Buffer; publicKey: Buffer; fingerprint: string; keyFile: string }> {
+export async function generateKeypair(
+  keyType = 'ed25519',
+): Promise<{ privateKey: Buffer; publicKey: Buffer; fingerprint: string; keyFile: string }> {
   if (keyType !== 'ed25519') {
     throw new Error(`Key type "${keyType}" not yet supported. Use ed25519.`);
   }
@@ -41,12 +43,19 @@ export async function generateKeypair(keyType = 'ed25519'): Promise<{ privateKey
 
   await ensureKeysDir();
   const keyFile = join(KEYS_DIR, `${fingerprint}.json`);
-  await writeFile(keyFile, JSON.stringify({
-    type: keyType,
-    fingerprint,
-    publicKey: toBase64url(publicKey),
-    privateKey: toBase64url(privateKey),
-  }, null, 2));
+  await writeFile(
+    keyFile,
+    JSON.stringify(
+      {
+        type: keyType,
+        fingerprint,
+        publicKey: toBase64url(publicKey),
+        privateKey: toBase64url(privateKey),
+      },
+      null,
+      2,
+    ),
+  );
 
   return { privateKey, publicKey, fingerprint, keyFile };
 }
