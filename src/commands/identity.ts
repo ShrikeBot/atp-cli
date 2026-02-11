@@ -29,10 +29,17 @@ identity
     console.error(`Key generated. Fingerprint: ${fingerprint}`);
     console.error(`Private key saved to: ${keyFile}`);
 
+    // Validate name: ASCII only, 1-64 chars
+    const name = opts.name!;
+    if (!/^[\x20-\x7E]{1,64}$/.test(name)) {
+      console.error('Error: Name must be 1-64 ASCII characters (no Unicode/homoglyphs)');
+      process.exit(1);
+    }
+
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'id',
-      n: opts.name,
+      n: name,
       k: {
         t: opts.key ?? 'ed25519',
         p: toBase64url(publicKey),

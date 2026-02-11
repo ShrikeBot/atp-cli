@@ -30,6 +30,30 @@ describe('Identity Schema', () => {
     expect(() => IdentitySchema.parse(doc)).not.toThrow();
   });
 
+  it('rejects Unicode homoglyph names', () => {
+    const doc = {
+      v: '1.0' as const,
+      t: 'id' as const,
+      n: 'Ѕhrike', // Cyrillic Ѕ
+      k: { t: 'ed25519', p: FAKE_PUB },
+      c: NOW,
+      s: FAKE_SIG,
+    };
+    expect(() => IdentitySchema.parse(doc)).toThrow();
+  });
+
+  it('rejects names over 64 characters', () => {
+    const doc = {
+      v: '1.0' as const,
+      t: 'id' as const,
+      n: 'a'.repeat(65),
+      k: { t: 'ed25519', p: FAKE_PUB },
+      c: NOW,
+      s: FAKE_SIG,
+    };
+    expect(() => IdentitySchema.parse(doc)).toThrow();
+  });
+
   it('rejects missing name', () => {
     const doc = {
       v: '1.0' as const,

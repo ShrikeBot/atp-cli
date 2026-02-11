@@ -4,7 +4,11 @@ import { VersionSchema, TimestampSchema, KeyOrKeysSchema, SignatureSchema } from
 export const IdentitySchema = z.object({
   v: VersionSchema,
   t: z.literal('id'),
-  n: z.string().min(1),
+  n: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only (no Unicode homoglyphs)'),
   k: KeyOrKeysSchema,
   c: TimestampSchema,
   s: z.union([SignatureSchema, z.array(SignatureSchema)]),

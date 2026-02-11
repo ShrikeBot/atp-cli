@@ -32,10 +32,14 @@ export function cborEncode(obj: unknown): Buffer {
 
 export { cborDecode };
 
-/** Encode document for signing (without `s` field) */
+/** Domain separator to prevent cross-protocol signature reuse */
+const DOMAIN_SEPARATOR = Buffer.from('ATP-v1.0:', 'ascii');
+
+/** Encode document for signing (without `s` field, with domain separator) */
 export function encodeForSigning(doc: Record<string, unknown>, format = 'json'): Buffer {
   const { s: _sig, ...unsigned } = doc;
-  return format === 'cbor' ? cborEncode(unsigned) : jsonCanonical(unsigned);
+  const encoded = format === 'cbor' ? cborEncode(unsigned) : jsonCanonical(unsigned);
+  return Buffer.concat([DOMAIN_SEPARATOR, encoded]);
 }
 
 /** Encode complete document */

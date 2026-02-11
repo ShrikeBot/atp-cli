@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { jsonCanonical, cborEncode, cborDecode, encodeForSigning } from '../src/lib/encoding.js';
+import { IdentityUnsignedSchema } from '../src/schemas/index.js';
 
 describe('JSON Canonical Encoding', () => {
   it('sorts keys deterministically', () => {
@@ -33,10 +34,13 @@ describe('CBOR Encoding', () => {
 });
 
 describe('encodeForSigning', () => {
-  it('strips the signature field', () => {
+  it('strips the signature field and prepends domain separator', () => {
     const doc = { v: '1.0', t: 'id', n: 'Test', c: 123, s: 'fakesig' };
     const bytes = encodeForSigning(doc, 'json');
-    const parsed = JSON.parse(bytes.toString('utf8'));
+    const str = bytes.toString('utf8');
+    expect(str).toMatch(/^ATP-v1\.0:/);
+    const jsonPart = str.slice('ATP-v1.0:'.length);
+    const parsed = JSON.parse(jsonPart);
     expect(parsed).not.toHaveProperty('s');
     expect(parsed).toHaveProperty('v', '1.0');
   });
