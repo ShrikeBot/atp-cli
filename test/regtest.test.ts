@@ -9,7 +9,7 @@
  * Run:  npm run test:regtest
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execSync, spawn, ChildProcess } from 'node:child_process';
+import { execSync, execFileSync, spawn, ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -478,6 +478,24 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       } catch { /* try next */ }
     }
     throw new Error(`No inscription found in any witness element of tx ${txid}`);
+  }
+
+  /** Run `atp verify` CLI command, capturing exit code / stdout / stderr */
+  function runVerify(source: string): { exitCode: number; stdout: string; stderr: string } {
+    const rpcUrl = `http://127.0.0.1:${RPC_PORT}`;
+    try {
+      const stdout = execFileSync('node', [
+        join(__dirname, '..', 'dist', 'index.js'), 'verify', source,
+        '--rpc-url', rpcUrl, '--rpc-user', RPC_USER, '--rpc-pass', RPC_PASS,
+      ], { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+      return { exitCode: 0, stdout, stderr: '' };
+    } catch (e: any) {
+      return {
+        exitCode: e.status ?? 1,
+        stdout: e.stdout?.toString() ?? '',
+        stderr: e.stderr?.toString() ?? '',
+      };
+    }
   }
 
   // ── Key helpers (same as integration.test.ts) ──────────────────────
@@ -964,10 +982,10 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       // Tamper after signing
       doc.n = 'TamperedName';
       const txid = await inscribe(doc);
-      const fetched = await fetchDoc(txid);
-      expect(fetched.n).toBe('TamperedName');
-      // Signature should NOT verify
-      expect(verifyIdentityDoc(fetched)).toBe(false);
+      // Verify via real CLI command
+      const result = runVerify(txid);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('INVALID');
     }, 60000);
 
     it('ADV-8: Fingerprint mismatch — from.f does not match signer', async () => {
@@ -985,10 +1003,10 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       AttestationUnsignedSchema.parse(doc);
       doc.s = toBase64url(sign(doc, keyA.privateKey));
       const txid = await inscribe(doc);
-      const fetched = await fetchDoc(txid);
-      // Sig verifies against keyA, but from.f doesn't match keyA's fingerprint
-      expect(verifyWithKey(fetched, keyA)).toBe(true); // sig is valid
-      expect((fetched.from as { f: string }).f).not.toBe(keyA.fingerprint); // but fingerprint is wrong
+      // Verify via real CLI command — should detect fingerprint mismatch
+      const result = runVerify(txid);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('mismatch');
     }, 60000);
 
     it('ADV-9: Wrong key signs revocation — should fail verification', async () => {
@@ -1005,11 +1023,10 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       RevocationUnsignedSchema.parse(doc);
       doc.s = toBase64url(sign(doc, keyB.privateKey));
       const txid = await inscribe(doc);
-      const fetched = await fetchDoc(txid);
-      // Verify against A's key should fail (signed by B)
-      expect(verifyWithKey(fetched, keyA)).toBe(false);
-      // Verify against B's key succeeds but B has no authority
-      expect(verifyWithKey(fetched, keyB)).toBe(true);
+      // Verify via real CLI command — signed by wrong key
+      const result = runVerify(txid);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('INVALID');
     }, 60000);
 
     it('ADV-10: Forged supersession — unrelated key C claims to supersede A', async () => {
@@ -1031,12 +1048,10 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const newSig = toBase64url(sign(doc, keyNew.privateKey));
       doc.s = [oldSig, newSig];
       const txid = await inscribe(doc);
-      const fetched = await fetchDoc(txid);
-      // Old key sig should NOT verify against A's key
-      const sigs = fetched.s as string[];
-      expect(verify(fetched, keyA.publicKey, fromBase64url(sigs[0]!))).toBe(false);
-      // It verifies against C's key, but C has no authority
-      expect(verify(fetched, keyC.publicKey, fromBase64url(sigs[0]!))).toBe(true);
+      // Verify via real CLI command — old key sig doesn't match target identity
+      const result = runVerify(txid);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('INVALID');
     }, 60000);
 
     // ── Protocol Violation Tests ───────────────────────────────────
@@ -1181,6 +1196,42 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow(/ASCII/i);
     });
+
+    // ── Happy-path CLI verify tests ──────────────────────────────────
+
+    it('ADV-NEW-1: Verify a valid identity via atp verify → exit 0', async () => {
+      const key = makeKey();
+      const { txid } = await createAndInscribeIdentity(key, 'ValidIdAgent');
+      const result = runVerify(txid);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('VALID');
+    }, 60000);
+
+    it('ADV-NEW-2: Verify a valid attestation via atp verify → exit 0', async () => {
+      const keyA = makeKey();
+      const keyB = makeKey();
+      const { txid: txA } = await createAndInscribeIdentity(keyA, 'AttestorValid');
+      const { txid: txB } = await createAndInscribeIdentity(keyB, 'AttesteeValid');
+      // Build attestation with correct ref TXIDs
+      const { txid: attTxid } = await createAndInscribeAttestation(
+        keyA, txA, keyB.fingerprint, txB, 'verified peer',
+      );
+      const result = runVerify(attTxid);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('VALID');
+    }, 60000);
+
+    it('ADV-NEW-3: Verify a valid supersession via atp verify → exit 0', async () => {
+      const keyOld = makeKey();
+      const keyNew = makeKey();
+      const { txid: idTxid } = await createAndInscribeIdentity(keyOld, 'SuperValid');
+      const { txid: superTxid } = await createAndInscribeSupersession(
+        keyOld, idTxid, keyNew, 'SuperValid', 'key-rotation',
+      );
+      const result = runVerify(superTxid);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('VALID');
+    }, 60000);
 
     it('ADV-22: Null bytes in name rejected by ASCII-only schema', () => {
       const key = makeKey();

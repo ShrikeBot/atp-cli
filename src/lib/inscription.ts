@@ -57,10 +57,24 @@ export function extractInscriptionFromWitness(witnessHex: string): {
   if (buf[pos] !== 0x01) throw new Error('Expected content-type tag');
   pos++;
 
-  const ctLen = buf[pos]!;
-  pos++;
-  const contentType = buf.subarray(pos, pos + ctLen).toString('ascii');
-  pos += ctLen;
+  // Detect format: real ordinals uses PUSH1 0x01 (tag value) then pushdata for ct,
+  // while the simple format uses <ctLen> <ct bytes> directly.
+  // Heuristic: if buf[pos] === 0x01 and buf[pos+1] > 0x01, it's real ordinals format
+  // (the 0x01 is the tag value, followed by a pushdata for content-type).
+  let contentType: string;
+  if (buf[pos] === 0x01 && pos + 1 < buf.length && buf[pos + 1]! > 0x01) {
+    // Real ordinals format: 01 01 <pushdata content-type>
+    pos++; // skip tag value 0x01
+    const { value: ctBuf, newPos } = readPush(buf, pos);
+    contentType = ctBuf.toString('ascii');
+    pos = newPos;
+  } else {
+    // Simple format: <ctLen> <ct bytes>
+    const ctLen = buf[pos]!;
+    pos++;
+    contentType = buf.subarray(pos, pos + ctLen).toString('ascii');
+    pos += ctLen;
+  }
 
   if (buf[pos] !== 0x00) throw new Error('Expected body separator');
   pos++;
@@ -71,27 +85,27 @@ export function extractInscriptionFromWitness(witnessHex: string): {
       pos++;
       continue;
     }
-    const len = buf[pos]!;
-    if (len <= 75) {
-      pos++;
-      dataChunks.push(buf.subarray(pos, pos + len));
-      pos += len;
-    } else if (len === 0x4c) {
-      pos++;
-      const dlen = buf[pos]!;
-      pos++;
-      dataChunks.push(buf.subarray(pos, pos + dlen));
-      pos += dlen;
-    } else if (len === 0x4d) {
-      pos++;
-      const dlen = buf[pos]! | (buf[pos + 1]! << 8);
-      pos += 2;
-      dataChunks.push(buf.subarray(pos, pos + dlen));
-      pos += dlen;
-    } else {
-      break;
-    }
+    const { value: chunk, newPos } = readPush(buf, pos);
+    dataChunks.push(chunk);
+    pos = newPos;
   }
 
   return { contentType, data: Buffer.concat(dataChunks) };
+}
+
+function readPush(buf: Buffer, pos: number): { value: Buffer; newPos: number } {
+  const op = buf[pos]!;
+  if (op === 0x00) return { value: Buffer.alloc(0), newPos: pos + 1 };
+  if (op <= 75) {
+    return { value: buf.subarray(pos + 1, pos + 1 + op), newPos: pos + 1 + op };
+  }
+  if (op === 0x4c) {
+    const len = buf[pos + 1]!;
+    return { value: buf.subarray(pos + 2, pos + 2 + len), newPos: pos + 2 + len };
+  }
+  if (op === 0x4d) {
+    const len = buf[pos + 1]! | (buf[pos + 2]! << 8);
+    return { value: buf.subarray(pos + 3, pos + 3 + len), newPos: pos + 3 + len };
+  }
+  throw new Error(`Unexpected opcode 0x${op.toString(16)} at position ${pos}`);
 }

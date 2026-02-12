@@ -35,7 +35,15 @@ async function fetchDoc(
     };
     const witness = tx.vin[0]?.txinwitness;
     if (!witness || witness.length === 0) throw new Error('No witness data in referenced tx');
-    const { contentType, data } = extractInscriptionFromWitness(witness[witness.length - 1]!);
+    let extracted: { contentType: string; data: Buffer } | null = null;
+    for (let i = witness.length - 1; i >= 0; i--) {
+      try {
+        extracted = extractInscriptionFromWitness(witness[i]!);
+        break;
+      } catch { /* try next */ }
+    }
+    if (!extracted) throw new Error('No inscription found in any witness element');
+    const { contentType, data } = extracted;
     if (contentType.includes('cbor')) {
       return cborDecode(data) as Record<string, unknown>;
     }
@@ -94,7 +102,19 @@ const verifyCmd = new Command('verify')
         console.error('No witness data found in transaction');
         process.exit(1);
       }
-      const { contentType, data } = extractInscriptionFromWitness(witness[witness.length - 1]!);
+      // Search all witness elements for an inscription (last element may be control block)
+      let extracted: { contentType: string; data: Buffer } | null = null;
+      for (let i = witness.length - 1; i >= 0; i--) {
+        try {
+          extracted = extractInscriptionFromWitness(witness[i]!);
+          break;
+        } catch { /* try next */ }
+      }
+      if (!extracted) {
+        console.error('No inscription found in any witness element');
+        process.exit(1);
+      }
+      const { contentType, data } = extracted;
       format = contentType.includes('cbor') ? 'cbor' : 'json';
       if (format === 'cbor') {
         doc = cborDecode(data) as Record<string, unknown>;
