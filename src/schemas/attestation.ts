@@ -9,7 +9,7 @@ export const AttestationSchema = z.object({
   ts: TimestampSchema.optional(),
   s: SignatureSchema,
   stake: z.number().optional(),
-  stake_tx: z.string().optional(),
+  stake_tx: z.string().regex(/^[0-9a-f]{64}$/i, 'stake_tx must be a valid TXID (64 hex chars)').optional(),
   ctx: z.string().optional(),
   exp: z.number().optional(),
 });

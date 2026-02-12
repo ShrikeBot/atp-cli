@@ -12,7 +12,7 @@ export const ReceiptSchema = z.object({
   t: z.literal('rcpt'),
   p: z.array(PartySchema).min(2),
   ex: ExchangeSchema,
-  out: z.string(),
+  out: z.enum(['completed', 'partial', 'cancelled', 'disputed']),
   ts: TimestampSchema.optional(),
   s: z.union([SignatureSchema, z.array(SignatureSchema)]),
 });

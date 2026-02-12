@@ -82,6 +82,9 @@ function sigValid(label: string, valid: boolean, fingerprint?: string): void {
   }
 }
 
+const CHAIN_STATE_WARNING =
+  '\n⚠  Document signature verified. Chain state NOT checked — verify revocation/supersession status via an explorer.';
+
 const verifyCmd = new Command('verify')
   .description('Verify an ATP document from file or TXID')
   .argument('<source>', 'File path or TXID')
@@ -188,7 +191,7 @@ const verifyCmd = new Command('verify')
               console.log(`  Fingerprint match: ✓`);
             }
             const sigBytes = fromBase64url(doc.s as string);
-            const valid = verify(doc, resolved.pubBytes, sigBytes, format);
+            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve attestor's identity via ref: ${(e as Error).message}`);
@@ -212,7 +215,7 @@ const verifyCmd = new Command('verify')
               console.log(`  Fingerprint match: ✓`);
             }
             const sigBytes = fromBase64url(doc.s as string);
-            const valid = verify(doc, resolved.pubBytes, sigBytes, format);
+            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve identity via ref: ${(e as Error).message}`);
@@ -240,9 +243,9 @@ const verifyCmd = new Command('verify')
             const sigs = doc.s as string[];
             const oldSigBytes = fromBase64url(sigs[0]);
             const newSigBytes = fromBase64url(sigs[1]);
-            const oldValid = verify(doc, oldKey.pubBytes, oldSigBytes, format);
+            const oldValid = verify(doc, oldKey.pubBytes, oldSigBytes, format, oldKey.keyType);
             sigValid('Old key signature', oldValid, oldKey.fingerprint);
-            const newValid = verify(doc, newPubBytes, newSigBytes, format);
+            const newValid = verify(doc, newPubBytes, newSigBytes, format, k.t);
             sigValid('New key signature', newValid, newFp);
           } catch (e) {
             console.error(`Error: could not resolve old identity via target.ref: ${(e as Error).message}`);
@@ -259,7 +262,7 @@ const verifyCmd = new Command('verify')
             const resolved = await resolveIdentity(target.ref, rpcOpts);
             console.log(`  Resolved target identity: ${resolved.fingerprint}`);
             const sigBytes = fromBase64url(doc.s as string);
-            const valid = verify(doc, resolved.pubBytes, sigBytes, format);
+            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve target identity via target.ref: ${(e as Error).message}`);
@@ -284,7 +287,7 @@ const verifyCmd = new Command('verify')
             const resolved = await resolveIdentity(from.ref, rpcOpts);
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
             const sigBytes = fromBase64url(doc.s as string);
-            const valid = verify(doc, resolved.pubBytes, sigBytes, format);
+            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`);
@@ -310,7 +313,7 @@ const verifyCmd = new Command('verify')
                   console.log(`    Fingerprint match: ✓`);
                 }
                 const sigBytes = fromBase64url(sigs[i]);
-                const valid = verify(doc, resolved.pubBytes, sigBytes, format);
+                const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                 sigValid(`  Party ${i} signature`, valid, resolved.fingerprint);
               } catch (e) {
                 console.error(`Error: could not resolve party ${i}'s identity: ${(e as Error).message}`);
@@ -327,6 +330,7 @@ const verifyCmd = new Command('verify')
           console.error(`Unknown document type: ${doc.t}`);
           process.exit(1);
       }
+      console.log(CHAIN_STATE_WARNING);
     } catch (e) {
       console.error(`Verification error: ${(e as Error).message}`);
       process.exit(1);

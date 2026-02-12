@@ -72,4 +72,98 @@ receipt
     }
   });
 
+receipt
+  .command('countersign')
+  .description('Verify first signature and add counterparty signature to a receipt')
+  .requiredOption('--receipt <file>', 'Partial receipt file (with first signature)')
+  .requiredOption('--identity <file>', 'Your identity file')
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
+  .option('--encoding <format>', 'json or cbor', 'json')
+  .option('--output <file>', 'Output file')
+  .action(async (opts: Record<string, string | undefined>) => {
+    const format = opts.encoding ?? 'json';
+    const doc = JSON.parse(await readFile(opts.receipt!, 'utf8'));
+
+    // Validate structure
+    if (doc.t !== 'rcpt' || !Array.isArray(doc.p) || !Array.isArray(doc.s)) {
+      console.error('Error: not a valid receipt document');
+      process.exit(1);
+    }
+
+    const parties = doc.p as Array<{ f: string; ref: { net: string; id: string }; role: string }>;
+    const sigs = doc.s as string[];
+
+    // Load our identity to find which party we are
+    const myDoc = JSON.parse(await readFile(opts.identity!, 'utf8'));
+    const myK = Array.isArray(myDoc.k) ? myDoc.k[0] : myDoc.k;
+    const myPub = fromBase64url(myK.p);
+    const myFp = computeFingerprint(myPub, myK.t);
+
+    const myIndex = parties.findIndex((p) => p.f === myFp);
+    if (myIndex === -1) {
+      console.error(`Error: your fingerprint (${myFp}) not found in receipt parties`);
+      process.exit(1);
+    }
+
+    // Verify the other party's signature before countersigning
+    const { s: _sigs, ...unsigned } = doc;
+    for (let i = 0; i < parties.length; i++) {
+      if (i === myIndex) continue;
+      if (!sigs[i] || sigs[i].startsWith('<')) {
+        console.error(`Error: party ${i} (${parties[i].role}) has not signed yet`);
+        process.exit(1);
+      }
+      // Verify their signature
+      const otherPub = fromBase64url(parties[i].f);
+      // Fingerprint is not the public key — we need to resolve from the identity doc
+      // For now, trust that the receipt was created correctly; the inscription will fail
+      // verification if the first signature is invalid anyway.
+      console.error(`Party ${i} (${parties[i].role}) signature present: ${parties[i].f}`);
+    }
+
+    // Verify first party's signature by re-encoding unsigned doc
+    const otherIndex = myIndex === 0 ? 1 : 0;
+    if (sigs[otherIndex] && !sigs[otherIndex].startsWith('<')) {
+      const { verify: verifySig } = await import('../lib/signing.js');
+      // We need the other party's public key — attempt to load from ref if it's a local file
+      try {
+        const otherRef = parties[otherIndex].ref;
+        const otherDoc = JSON.parse(await readFile(otherRef.id, 'utf8'));
+        const otherK = Array.isArray(otherDoc.k) ? otherDoc.k[0] : otherDoc.k;
+        const otherPub = fromBase64url(otherK.p);
+        const otherFp = computeFingerprint(otherPub, otherK.t);
+        if (otherFp !== parties[otherIndex].f) {
+          console.error(`Error: party ${otherIndex} fingerprint mismatch — expected ${parties[otherIndex].f}, got ${otherFp}`);
+          process.exit(1);
+        }
+        const otherSigBytes = fromBase64url(sigs[otherIndex]);
+        const valid = verifySig(unsigned as Record<string, unknown>, otherPub, otherSigBytes, format);
+        if (!valid) {
+          console.error(`Error: party ${otherIndex} (${parties[otherIndex].role}) signature is INVALID — refusing to countersign`);
+          process.exit(1);
+        }
+        console.error(`Party ${otherIndex} (${parties[otherIndex].role}) signature: ✓ VALID`);
+      } catch {
+        console.error(`Warning: could not verify party ${otherIndex}'s signature (identity not available locally). Proceeding — inscription will fail if invalid.`);
+      }
+    }
+
+    // Sign
+    const key = opts.privateKey
+      ? await loadPrivateKeyFromFile(opts.privateKey, myK.t)
+      : await loadPrivateKeyByFile(opts.identity!);
+    const { sign: signDoc } = await import('../lib/signing.js');
+    const sig = signDoc(unsigned as Record<string, unknown>, key.privateKey, format);
+    sigs[myIndex] = format === 'cbor' ? sig as unknown as string : toBase64url(sig);
+    doc.s = sigs;
+
+    const output = encodeDocument(doc, format);
+    if (opts.output) {
+      await writeFile(opts.output, output);
+      console.error(`Receipt (countersigned) written to: ${opts.output}`);
+    } else {
+      console.log(format === 'cbor' ? output.toString('hex') : output.toString('utf8'));
+    }
+  });
+
 export default receipt;

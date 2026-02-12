@@ -12,9 +12,12 @@ export const Base64urlSchema = z.string().regex(/^[A-Za-z0-9_-]+$/, 'Invalid bas
 /** Base64url-encoded signature (single) */
 export const SignatureSchema = z.union([Base64urlSchema, z.instanceof(Uint8Array)]);
 
+/** Supported key types */
+export const KeyTypeSchema = z.enum(['ed25519', 'secp256k1']);
+
 /** Key object */
 export const KeySchema = z.object({
-  t: z.string(),
+  t: KeyTypeSchema,
   p: Base64urlSchema,
   role: z.string().optional(),
 });

@@ -1,4 +1,5 @@
 import { ed25519 } from '@noble/curves/ed25519';
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -32,13 +33,19 @@ export function generateEd25519(): { privateKey: Buffer; publicKey: Buffer } {
   return { privateKey: Buffer.from(privBytes), publicKey: Buffer.from(pubBytes) };
 }
 
+export function generateSecp256k1(): { privateKey: Buffer; publicKey: Buffer } {
+  const privBytes = randomBytes(32);
+  const pubBytes = secp256k1.getPublicKey(privBytes, true); // compressed 33 bytes
+  return { privateKey: Buffer.from(privBytes), publicKey: Buffer.from(pubBytes) };
+}
+
 export async function generateKeypair(
   keyType = 'ed25519',
 ): Promise<{ privateKey: Buffer; publicKey: Buffer; fingerprint: string; keyFile: string }> {
-  if (keyType !== 'ed25519') {
-    throw new Error(`Key type "${keyType}" not yet supported. Use ed25519.`);
+  if (keyType !== 'ed25519' && keyType !== 'secp256k1') {
+    throw new Error(`Key type "${keyType}" not yet supported. Use ed25519 or secp256k1.`);
   }
-  const { privateKey, publicKey } = generateEd25519();
+  const { privateKey, publicKey } = keyType === 'secp256k1' ? generateSecp256k1() : generateEd25519();
   const fingerprint = computeFingerprint(publicKey, keyType);
 
   await ensureKeysDir();
@@ -140,10 +147,12 @@ export async function loadPrivateKeyFromFile(
   }
 
   if (privBytes!.length !== 32) {
-    throw new Error(`Private key is ${privBytes!.length} bytes, expected 32 for Ed25519`);
+    throw new Error(`Private key is ${privBytes!.length} bytes, expected 32`);
   }
 
-  const pubBytes = Buffer.from(ed25519.getPublicKey(privBytes!));
+  const pubBytes = keyType === 'secp256k1'
+    ? Buffer.from(secp256k1.getPublicKey(privBytes!, true))
+    : Buffer.from(ed25519.getPublicKey(privBytes!));
   const fingerprint = computeFingerprint(pubBytes, keyType);
 
   return {
