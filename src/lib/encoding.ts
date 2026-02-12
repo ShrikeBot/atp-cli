@@ -32,21 +32,8 @@ export function cborEncode(obj: unknown): Buffer {
 
 export { cborDecode };
 
-/** Build domain separator from document type: ATP-v1.0:{t}: */
-function domainSeparator(docType: string): Buffer {
-  const typeMap: Record<string, string> = {
-    id: 'id',
-    att: 'att',
-    super: 'super',
-    revoke: 'revoke',
-    hb: 'hb',
-    rcpt: 'rcpt',
-    'att-revoke': 'att-revoke',
-  };
-  const sep = typeMap[docType];
-  if (!sep) throw new Error(`Unknown document type for domain separator: ${docType}`);
-  return Buffer.from(`ATP-v1.0:${sep}:`, 'ascii');
-}
+/** Domain separator: prevents cross-protocol signature reuse */
+const DOMAIN_SEPARATOR = Buffer.from('ATP-v1.0:', 'ascii');
 
 /** Known binary fields that must be byte strings in CBOR */
 const BINARY_FIELDS = new Set(['p', 's', 'f']);
@@ -94,7 +81,7 @@ export function buffersToBase64url(obj: unknown): unknown {
 /** Encode document for signing (without `s` field, with domain separator) */
 export function encodeForSigning(doc: Record<string, unknown>, format = 'json'): Buffer {
   const { s: _sig, ...unsigned } = doc;
-  const separator = domainSeparator(doc.t as string);
+  const separator = DOMAIN_SEPARATOR;
   if (format === 'cbor') {
     const withBinaries = binaryFieldsToBuffers(unsigned);
     return Buffer.concat([separator, cborEncode(withBinaries)]);
