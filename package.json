@@ -11,7 +11,8 @@
   "scripts": {
     "build": "tsc",
     "atp": "node dist/index.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/regtest.test.ts",
+    "test:regtest": "vitest run test/regtest.test.ts",
     "lint": "eslint src/",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
