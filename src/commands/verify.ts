@@ -66,7 +66,12 @@ async function resolveIdentity(
 
 function sigValid(label: string, valid: boolean, fingerprint?: string): void {
   const fpStr = fingerprint ? ` (${fingerprint})` : '';
-  console.log(`  ${label}${fpStr}: ${valid ? '✓ VALID' : '✗ INVALID'}`);
+  if (valid) {
+    console.log(`  ${label}${fpStr}: ✓ VALID`);
+  } else {
+    console.error(`  ${label}${fpStr}: ✗ INVALID`);
+    process.exit(1);
+  }
 }
 
 const verifyCmd = new Command('verify')
@@ -103,7 +108,13 @@ const verifyCmd = new Command('verify')
     }
 
     // Validate against schema
-    AtpDocumentSchema.parse(doc);
+    try {
+      AtpDocumentSchema.parse(doc);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`Schema validation failed: ${msg}`);
+      process.exit(1);
+    }
     console.log(`Schema validation: ✓`);
 
     if (doc.v !== '1.0') {
@@ -116,7 +127,8 @@ const verifyCmd = new Command('verify')
         validateTimestamp(doc.ts as number, 'Document');
         console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
       } catch (e) {
-        console.warn(`⚠ ${(e as Error).message}`);
+        console.error(`Error: ${(e as Error).message}`);
+        process.exit(1);
       }
     } else {
       console.log(`Timestamp: not present (optional)`);
@@ -151,7 +163,8 @@ const verifyCmd = new Command('verify')
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
             // Verify fingerprint match
             if (from.f !== resolved.fingerprint) {
-              console.log(`  ✗ Fingerprint mismatch: doc says ${from.f}, resolved ${resolved.fingerprint}`);
+              console.error(`  ✗ Fingerprint mismatch: doc says ${from.f}, resolved ${resolved.fingerprint}`);
+              process.exit(1);
             } else {
               console.log(`  Fingerprint match: ✓`);
             }
@@ -174,7 +187,8 @@ const verifyCmd = new Command('verify')
             const resolved = await resolveIdentity(ref, rpcOpts);
             console.log(`  Resolved identity: ${resolved.fingerprint}`);
             if (f !== resolved.fingerprint) {
-              console.log(`  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`);
+              console.error(`  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`);
+              process.exit(1);
             } else {
               console.log(`  Fingerprint match: ✓`);
             }
@@ -199,7 +213,8 @@ const verifyCmd = new Command('verify')
             const oldKey = await resolveIdentity(target.ref, rpcOpts);
             console.log(`  Resolved old identity: ${oldKey.fingerprint}`);
             if (target.f !== oldKey.fingerprint) {
-              console.log(`  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${oldKey.fingerprint}`);
+              console.error(`  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${oldKey.fingerprint}`);
+              process.exit(1);
             } else {
               console.log(`  Target fingerprint match: ✓`);
             }
@@ -227,9 +242,6 @@ const verifyCmd = new Command('verify')
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format);
             sigValid('Signature', valid, resolved.fingerprint);
-            if (!valid) {
-              console.log('  Note: signer may be any key in the supersession chain. The target key was tried but failed.');
-            }
           } catch (e) {
             console.error(`Error: could not resolve target identity via target.ref: ${(e as Error).message}`);
             process.exit(1);
@@ -245,8 +257,8 @@ const verifyCmd = new Command('verify')
             // Resolve the original attestation to find the attestor
             const attDoc = await fetchDoc(ref, rpcOpts);
             if (attDoc.t !== 'att') {
-              console.log(`  ✗ Referenced document is type '${attDoc.t}', expected 'att'`);
-              break;
+              console.error(`  ✗ Referenced document is type '${attDoc.t}', expected 'att'`);
+              process.exit(1);
             }
             const from = attDoc.from as { f: string; ref: { net: string; id: string } };
             console.log(`  Original attestor: ${from.f}`);
@@ -273,7 +285,8 @@ const verifyCmd = new Command('verify')
               try {
                 const resolved = await resolveIdentity(party.ref, rpcOpts);
                 if (party.f !== resolved.fingerprint) {
-                  console.log(`    ✗ Fingerprint mismatch: doc says ${party.f}, resolved ${resolved.fingerprint}`);
+                  console.error(`    ✗ Fingerprint mismatch: doc says ${party.f}, resolved ${resolved.fingerprint}`);
+                  process.exit(1);
                 } else {
                   console.log(`    Fingerprint match: ✓`);
                 }
@@ -293,6 +306,7 @@ const verifyCmd = new Command('verify')
 
         default:
           console.error(`Unknown document type: ${doc.t}`);
+          process.exit(1);
       }
     } catch (e) {
       console.error(`Verification error: ${(e as Error).message}`);
