@@ -19,9 +19,6 @@ export const KeySchema = z.object({
   role: z.string().optional(),
 });
 
-/** Array of keys or single key */
-export const KeyOrKeysSchema = z.union([KeySchema, z.array(KeySchema).min(1)]);
-
 /** Reference object (points to another identity) */
 export const ReferenceSchema = z.object({
   t: z.string(),

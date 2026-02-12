@@ -29,9 +29,12 @@ describe('key commands', () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'atp-key-test-'));
-    // Generate a keypair and save a raw hex key file for import testing
-    const { privateKey, publicKey } = generateEd25519();
-    fingerprint = computeFingerprint(publicKey, 'ed25519');
+    // Generate a keypair, retry if fingerprint starts with '-' (commander parses as option)
+    let privateKey: Buffer, publicKey: Buffer;
+    do {
+      ({ privateKey, publicKey } = generateEd25519());
+      fingerprint = computeFingerprint(publicKey, 'ed25519');
+    } while (fingerprint.startsWith('-'));
     // Write hex format key file
     await writeFile(join(tmpDir, 'test.hex'), privateKey.toString('hex'));
     // Write JSON format key file

@@ -60,16 +60,13 @@ const verifyCmd = new Command('verify')
     console.log(`Document type: ${doc.t}`);
 
     if (doc.t === 'id') {
-      const k = Array.isArray(doc.k) ? doc.k : [doc.k];
-      const sigs = Array.isArray(doc.s) ? doc.s : [doc.s];
-
-      for (let i = 0; i < k.length; i++) {
-        const pubBytes = fromBase64url(k[i].p);
-        const sigBytes = typeof sigs[i] === 'string' ? fromBase64url(sigs[i]) : sigs[i];
-        const fp = computeFingerprint(pubBytes, k[i].t);
-        const valid = verify(doc, pubBytes, sigBytes, format);
-        console.log(`Key ${i} (${k[i].t}, ${fp}): ${valid ? '✓ VALID' : '✗ INVALID'}`);
-      }
+      const k = doc.k as { t: string; p: string };
+      const sig = doc.s;
+      const pubBytes = fromBase64url(k.p);
+      const sigBytes = typeof sig === 'string' ? fromBase64url(sig) : (sig as Uint8Array);
+      const fp = computeFingerprint(pubBytes, k.t);
+      const valid = verify(doc, pubBytes, sigBytes, format);
+      console.log(`Key (${k.t}, ${fp}): ${valid ? '✓ VALID' : '✗ INVALID'}`);
     } else if (doc.t === 'att') {
       console.log(
         `Attestation from ${(doc.from as { f: string }).f} to ${(doc.to as { f: string }).f}`,

@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, KeyOrKeysSchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, KeySchema, SignatureSchema } from './common.js';
+
+/** External key reference for cross-platform identity linking */
+export const ExternalKeyRefSchema = z.object({
+  t: z.string(),
+  f: z.string(),
+});
 
 export const IdentitySchema = z.object({
   v: VersionSchema,
@@ -9,12 +15,13 @@ export const IdentitySchema = z.object({
     .min(1)
     .max(64)
     .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only (no Unicode homoglyphs)'),
-  k: KeyOrKeysSchema,
+  k: KeySchema,
   c: TimestampSchema,
-  s: z.union([SignatureSchema, z.array(SignatureSchema)]),
+  s: SignatureSchema,
   w: z.string().optional(),
   m: z.record(z.string(), z.string()).optional(),
   sup: z.string().optional(),
+  keys: z.array(ExternalKeyRefSchema).optional(),
 });
 
 /** Identity document without signature (for pre-sign validation) */

@@ -24,6 +24,10 @@ identity
   .option('--handle-github <handle>', 'GitHub handle')
   .option('--handle-nostr <handle>', 'Nostr handle')
   .option('--wallet <address>', 'Bitcoin payment address')
+  .option('--ssh-key <fingerprint>', 'SSH key fingerprint (added to external keys)')
+  .option('--gpg-key <fingerprint>', 'GPG key fingerprint (added to external keys)')
+  .option('--bitcoin-key <address>', 'Bitcoin address (added to external keys)')
+  .option('--nostr-key <npub>', 'Nostr npub (added to external keys)')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
@@ -96,6 +100,13 @@ identity
     if (opts.handleNostr) meta.nostr = opts.handleNostr as string;
     if (Object.keys(meta).length > 0) doc.m = meta;
 
+    const externalKeys: Array<{ t: string; f: string }> = [];
+    if (opts.sshKey) externalKeys.push({ t: 'ssh-ed25519', f: opts.sshKey as string });
+    if (opts.gpgKey) externalKeys.push({ t: 'gpg', f: opts.gpgKey as string });
+    if (opts.bitcoinKey) externalKeys.push({ t: 'bitcoin', f: opts.bitcoinKey as string });
+    if (opts.nostrKey) externalKeys.push({ t: 'nostr', f: opts.nostrKey as string });
+    if (externalKeys.length > 0) doc.keys = externalKeys;
+
     // Validate before signing
     IdentityUnsignedSchema.parse(doc);
 
@@ -131,7 +142,7 @@ identity
     console.log(`Version:     ${doc.v}`);
     console.log(`Type:        ${doc.t}`);
 
-    const k = Array.isArray(doc.k) ? doc.k[0] : doc.k;
+    const k = doc.k;
     const pubBytes = fromBase64url(k.p);
     const fp = computeFingerprint(pubBytes, k.t);
     console.log(`Key Type:    ${k.t}`);
