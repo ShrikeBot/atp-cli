@@ -6,7 +6,7 @@ export const SupersessionSchema = z.object({
   t: z.literal('super'),
   old: ReferenceSchema,
   new: ReferenceSchema,
-  reason: z.enum(['key-rotation', 'algorithm-upgrade', 'key-compromised']),
+  reason: z.enum(['key-rotation', 'algorithm-upgrade', 'key-compromised', 'metadata-update']),
   c: TimestampSchema,
   s: z.union([SignatureSchema, z.array(SignatureSchema)]),
 });

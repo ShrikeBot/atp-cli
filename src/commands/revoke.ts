@@ -10,7 +10,8 @@ import { RevocationUnsignedSchema } from '../schemas/index.js';
 const revoke = new Command('revoke')
   .description('Revoke an identity permanently')
   .requiredOption('--identity <file>', 'Identity file to revoke')
-  .requiredOption('--reason <reason>', 'Reason: key-compromised, defunct, superseded')
+  .requiredOption('--reason <reason>', 'Reason: key-compromised, defunct')
+  .option('--key <file>', 'Key file to sign with (for chain revocation with an old key)')
   .option('--txid <txid>', 'Identity inscription TXID')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
@@ -32,7 +33,9 @@ const revoke = new Command('revoke')
     // Validate before signing
     RevocationUnsignedSchema.parse(doc);
 
-    const key = await loadPrivateKeyByFile(opts.identity!);
+    const key = opts.key
+      ? await loadPrivateKeyByFile(opts.key)
+      : await loadPrivateKeyByFile(opts.identity!);
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);

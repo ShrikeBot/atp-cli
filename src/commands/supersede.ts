@@ -8,7 +8,7 @@ import { loadPrivateKeyByFile } from '../lib/keys.js';
 import { SupersessionUnsignedSchema } from '../schemas/index.js';
 
 const supersede = new Command('supersede')
-  .description('Create a supersession document (key rotation)')
+  .description('Create a supersession document (key rotation or metadata update with same key)')
   .requiredOption('--old <file>', 'Old identity file')
   .requiredOption('--new <file>', 'New identity file')
   .requiredOption('--reason <reason>', 'Reason: key-rotation, algorithm-upgrade, key-compromised')

@@ -148,6 +148,7 @@ describe('Heartbeat Schema', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      seq: 0,
       c: NOW,
     };
     expect(() => HeartbeatUnsignedSchema.parse(doc)).not.toThrow();
@@ -158,6 +159,7 @@ describe('Heartbeat Schema', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      seq: 1,
       c: NOW,
       msg: 'still alive',
     };
@@ -224,6 +226,7 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      seq: 42,
       c: NOW,
       s: FAKE_SIG,
     };

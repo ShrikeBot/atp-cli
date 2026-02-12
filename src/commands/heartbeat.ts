@@ -10,6 +10,7 @@ import { HeartbeatUnsignedSchema } from '../schemas/index.js';
 const heartbeat = new Command('heartbeat')
   .description('Create a signed heartbeat proving liveness')
   .requiredOption('--from <file>', 'Your identity file')
+  .requiredOption('--seq <n>', 'Sequence number (monotonically increasing)', parseInt)
   .option('--msg <text>', 'Optional status message')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
@@ -23,6 +24,7 @@ const heartbeat = new Command('heartbeat')
       v: '1.0',
       t: 'hb',
       f: fp,
+      seq: opts.seq as unknown as number,
       c: Math.floor(Date.now() / 1000),
     };
     validateTimestamp(doc.c as number, 'Heartbeat');

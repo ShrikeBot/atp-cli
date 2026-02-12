@@ -86,6 +86,8 @@ const verifyCmd = new Command('verify')
     } else if (doc.t === 'revoke') {
       console.log(`Revocation of ${(doc.subject as { f: string }).f}`);
       console.log(`Reason: ${doc.reason}`);
+      // Note: the signer may be any key in the supersession chain, not just the current key
+      console.log('Note: signer may be any key in the supersession chain.');
     } else if (doc.t === 'att-revoke') {
       console.log(`Attestation revocation`);
       console.log(`Ref: ${doc.ref}`);

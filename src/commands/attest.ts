@@ -12,7 +12,8 @@ const attest = new Command('attest')
   .argument('<fingerprint>', 'Target agent fingerprint')
   .requiredOption('--from <file>', 'Your identity file')
   .option('--to-key-type <type>', 'Target key type', 'ed25519')
-  .option('--stake <sats>', 'Sats to stake', parseInt)
+  .option('--stake <sats>', 'Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)', parseInt)
+  .option('--stake-tx <txid>', 'TXID of stake transaction to treasury')
   .option('--claim <type>', 'Claim type: identity, capability, reliability', 'identity')
   .option('--context <text>', 'Context/reason for attestation')
   .option('--encoding <format>', 'json or cbor', 'json')
@@ -33,6 +34,7 @@ const attest = new Command('attest')
     validateTimestamp(doc.c as number, 'Attestation');
 
     if (opts.stake) doc.stake = opts.stake;
+    if (opts.stakeTx) doc.stake_tx = opts.stakeTx;
     if (opts.context) doc.ctx = opts.context;
 
     // Validate before signing

@@ -5,6 +5,7 @@ export const HeartbeatSchema = z.object({
   v: VersionSchema,
   t: z.literal('hb'),
   f: z.string(),
+  seq: z.number().int().nonnegative(),
   c: TimestampSchema,
   s: SignatureSchema,
   msg: z.string().optional(),
