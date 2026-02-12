@@ -9,6 +9,42 @@ import { buildInscriptionEnvelope } from '../lib/inscription.js';
 import { IdentityUnsignedSchema } from '../schemas/index.js';
 import { ed25519 } from '@noble/curves/ed25519';
 
+/** Collect --meta collection:key:value into array of [collection, key, value] */
+function collectMeta(val: string, prev: string[][]) {
+  const parts = val.split(':');
+  if (parts.length < 3) {
+    console.error('Error: --meta requires format collection:key:value');
+    process.exit(1);
+  }
+  const [collection, key, ...rest] = parts;
+  prev.push([collection, key, rest.join(':')]);
+  return prev;
+}
+
+/** Create a collector for shorthand flags like --link, --key-ref, --wallet */
+function collectPair(collection: string) {
+  return (val: string, prev: string[][]) => {
+    const idx = val.indexOf(':');
+    if (idx === -1) {
+      console.error(`Error: expected format key:value, got "${val}"`);
+      process.exit(1);
+    }
+    prev.push([collection, val.slice(0, idx), val.slice(idx + 1)]);
+    return prev;
+  };
+}
+
+/** Build structured metadata object from collected tuples */
+function buildMetadata(tuples: string[][]): Record<string, [string, string][]> | undefined {
+  if (tuples.length === 0) return undefined;
+  const m: Record<string, [string, string][]> = {};
+  for (const [collection, key, value] of tuples) {
+    if (!m[collection]) m[collection] = [];
+    m[collection].push([key, value]);
+  }
+  return m;
+}
+
 const identity = new Command('identity').description('Identity management');
 
 identity
@@ -19,15 +55,10 @@ identity
   .option('--private-key <file>', 'Use existing private key file instead of generating one')
   .option('--public-key <file>', 'Use existing public key file')
   .option('--no-save', 'Do not save keypair to ~/.atp/keys/')
-  .option('--handle-twitter <handle>', 'Twitter handle')
-  .option('--handle-moltbook <handle>', 'Moltbook handle')
-  .option('--handle-github <handle>', 'GitHub handle')
-  .option('--handle-nostr <handle>', 'Nostr handle')
-  .option('--wallet <address>', 'Bitcoin payment address')
-  .option('--ssh-key <fingerprint>', 'SSH key fingerprint (added to external keys)')
-  .option('--gpg-key <fingerprint>', 'GPG key fingerprint (added to external keys)')
-  .option('--bitcoin-key <address>', 'Bitcoin address (added to external keys)')
-  .option('--nostr-key <npub>', 'Nostr npub (added to external keys)')
+  .option('--meta <collection:key:value>', 'Add metadata tuple (repeatable, e.g. --meta links:twitter:@shrikey_)', collectMeta, [])
+  .option('--link <platform:handle>', 'Add link (shorthand for --meta links:platform:handle)', collectPair('links'), [])
+  .option('--key-ref <type:fingerprint>', 'Add key reference (shorthand for --meta keys:type:fp)', collectPair('keys'), [])
+  .option('--wallet <type:address>', 'Add wallet (shorthand for --meta wallets:type:address)', collectPair('wallets'), [])
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
   .action(async (opts: Record<string, string | boolean | undefined>) => {
@@ -91,21 +122,15 @@ identity
     };
     validateTimestamp(doc.c as number, 'Identity');
 
-    if (opts.wallet) doc.w = opts.wallet;
-
-    const meta: Record<string, string> = {};
-    if (opts.handleTwitter) meta.twitter = opts.handleTwitter as string;
-    if (opts.handleMoltbook) meta.moltbook = opts.handleMoltbook as string;
-    if (opts.handleGithub) meta.github = opts.handleGithub as string;
-    if (opts.handleNostr) meta.nostr = opts.handleNostr as string;
-    if (Object.keys(meta).length > 0) doc.m = meta;
-
-    const externalKeys: Array<{ t: string; f: string }> = [];
-    if (opts.sshKey) externalKeys.push({ t: 'ssh-ed25519', f: opts.sshKey as string });
-    if (opts.gpgKey) externalKeys.push({ t: 'gpg', f: opts.gpgKey as string });
-    if (opts.bitcoinKey) externalKeys.push({ t: 'bitcoin', f: opts.bitcoinKey as string });
-    if (opts.nostrKey) externalKeys.push({ t: 'nostr', f: opts.nostrKey as string });
-    if (externalKeys.length > 0) doc.keys = externalKeys;
+    // Collect all metadata tuples from --meta, --link, --key-ref, --wallet
+    const allTuples: string[][] = [
+      ...((opts.meta as unknown as string[][]) || []),
+      ...((opts.link as unknown as string[][]) || []),
+      ...((opts.keyRef as unknown as string[][]) || []),
+      ...((opts.wallet as unknown as string[][]) || []),
+    ];
+    const m = buildMetadata(allTuples);
+    if (m) doc.m = m;
 
     // Validate before signing
     IdentityUnsignedSchema.parse(doc);
@@ -149,11 +174,13 @@ identity
     console.log(`Fingerprint: ${fp}`);
     console.log(`Public Key:  ${k.p}`);
 
-    if (doc.w) console.log(`Wallet:      ${doc.w}`);
     if (doc.m) {
-      console.log(`Handles:`);
-      for (const [platform, handle] of Object.entries(doc.m as Record<string, string>)) {
-        console.log(`  ${platform}: ${handle}`);
+      console.log(`Metadata:`);
+      for (const [collection, entries] of Object.entries(doc.m as Record<string, [string, string][]>)) {
+        console.log(`  ${collection}:`);
+        for (const [key, value] of entries) {
+          console.log(`    ${key}: ${value}`);
+        }
       }
     }
     console.log(`Created:     ${new Date(doc.c * 1000).toISOString()}`);

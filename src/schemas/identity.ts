@@ -1,11 +1,8 @@
 import { z } from 'zod';
 import { VersionSchema, TimestampSchema, KeySchema, SignatureSchema } from './common.js';
 
-/** External key reference for cross-platform identity linking */
-export const ExternalKeyRefSchema = z.object({
-  t: z.string(),
-  f: z.string(),
-});
+/** Structured metadata: named collections of key-value tuples */
+export const MetadataSchema = z.record(z.string(), z.array(z.tuple([z.string(), z.string()]))).optional();
 
 export const IdentitySchema = z.object({
   v: VersionSchema,
@@ -18,10 +15,8 @@ export const IdentitySchema = z.object({
   k: KeySchema,
   c: TimestampSchema,
   s: SignatureSchema,
-  w: z.string().optional(),
-  m: z.record(z.string(), z.string()).optional(),
+  m: MetadataSchema,
   sup: z.string().optional(),
-  keys: z.array(ExternalKeyRefSchema).optional(),
 });
 
 /** Identity document without signature (for pre-sign validation) */

@@ -84,8 +84,10 @@ describe('Identity Schema', () => {
       k: { t: 'ed25519', p: FAKE_PUB },
       c: NOW,
       s: FAKE_SIG,
-      w: 'bc1qtest',
-      m: { twitter: '@shrikey_', github: 'ShrikeBot' },
+      m: {
+        links: [['twitter', '@shrikey_'], ['github', 'ShrikeBot']],
+        wallets: [['bitcoin', 'bc1qtest']],
+      },
     };
     expect(() => IdentitySchema.parse(doc)).not.toThrow();
   });
