@@ -21,8 +21,8 @@ export const KeySchema = z.object({
 
 /** Location reference (platform-agnostic document locator) */
 export const LocationRefSchema = z.object({
-  net: z.string().min(1).regex(/^[a-z0-9]+:.+$/, 'Invalid CAIP-2 format (expected namespace:reference)'),
-  id: z.string().min(1),
+  net: z.string().min(1).max(2048).regex(/^[a-z0-9]+:.+$/, 'Invalid CAIP-2 format (expected namespace:reference)'),
+  id: z.string().min(1).max(2048),
 });
 
 /** Reference object (points to another identity) */
