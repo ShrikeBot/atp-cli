@@ -44,9 +44,9 @@ receipt
         ...(opts.value && { val: opts.value }),
       },
       out: opts.outcome ?? 'completed',
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Receipt');
+    validateTimestamp(doc.ts as number, 'Receipt');
 
     // Validate before signing
     ReceiptUnsignedSchema.parse(doc);

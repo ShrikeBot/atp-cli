@@ -33,9 +33,9 @@ const attest = new Command('attest')
       t: 'att',
       from: { f: fromFp, ref: { net, id: opts.fromTxid as string } },
       to: { f: fingerprint, ref: { net, id: opts.toTxid as string } },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Attestation');
+    validateTimestamp(doc.ts as number, 'Attestation');
 
     if (opts.stake) doc.stake = opts.stake;
     if (opts.stakeTx) doc.stake_tx = opts.stakeTx;

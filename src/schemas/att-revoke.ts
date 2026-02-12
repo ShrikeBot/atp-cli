@@ -6,7 +6,7 @@ export const AttRevocationSchema = z.object({
   t: z.literal('att-revoke'),
   ref: LocationRefSchema,
   reason: z.enum(['retracted', 'fraudulent', 'expired', 'error']),
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: SignatureSchema,
 });
 

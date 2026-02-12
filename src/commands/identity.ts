@@ -118,9 +118,9 @@ identity
         t: keyType,
         p: toBase64url(publicKey),
       },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Identity');
+    validateTimestamp(doc.ts as number, 'Identity');
 
     // Collect all metadata tuples from --meta, --link, --key-ref, --wallet
     const allTuples: string[][] = [
@@ -183,7 +183,7 @@ identity
         }
       }
     }
-    console.log(`Created:     ${new Date(doc.c * 1000).toISOString()}`);
+    console.log(`Created:     ${new Date(doc.ts * 1000).toISOString()}`);
     console.log(
       `Signature:   ${typeof doc.s === 'string' ? doc.s.slice(0, 32) + '...' : '(binary)'}`,
     );

@@ -20,7 +20,7 @@ export const SupersessionSchema = z.object({
   k: KeySchema,
   m: MetadataSchema,
   reason: z.enum(['key-rotation', 'algorithm-upgrade', 'key-compromised', 'metadata-update']),
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: z.union([SignatureSchema, z.array(SignatureSchema)]),
 });
 

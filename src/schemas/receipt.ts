@@ -13,7 +13,7 @@ export const ReceiptSchema = z.object({
   p: z.array(PartySchema).min(2),
   ex: ExchangeSchema,
   out: z.string(),
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: z.union([SignatureSchema, z.array(SignatureSchema)]),
 });
 

@@ -29,9 +29,9 @@ const revoke = new Command('revoke')
       t: 'revoke',
       target: { f: fp, ref: { net, id: opts.txid as string } },
       reason: opts.reason,
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Revocation');
+    validateTimestamp(doc.ts as number, 'Revocation');
 
     // Validate before signing
     RevocationUnsignedSchema.parse(doc);

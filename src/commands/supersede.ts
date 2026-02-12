@@ -118,10 +118,10 @@ const supersede = new Command('supersede')
         p: toBase64url(newPublicKey),
       },
       reason: opts.reason,
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
     if (m) doc.m = m;
-    validateTimestamp(doc.c as number, 'Supersession');
+    validateTimestamp(doc.ts as number, 'Supersession');
 
     // Validate before signing
     SupersessionUnsignedSchema.parse(doc);

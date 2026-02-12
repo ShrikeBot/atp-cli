@@ -30,9 +30,9 @@ const heartbeat = new Command('heartbeat')
       f: fp,
       ref: { net, id: opts.txid as string },
       seq: opts.seq as unknown as number,
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Heartbeat');
+    validateTimestamp(doc.ts as number, 'Heartbeat');
 
     if (opts.msg) doc.msg = opts.msg;
 

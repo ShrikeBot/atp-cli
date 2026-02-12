@@ -6,7 +6,7 @@ export const AttestationSchema = z.object({
   t: z.literal('att'),
   from: ReferenceSchema,
   to: ReferenceSchema,
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: SignatureSchema,
   stake: z.number().optional(),
   stake_tx: z.string().optional(),

@@ -26,7 +26,7 @@ describe('Identity Schema', () => {
       t: 'id' as const,
       n: 'Shrike',
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => IdentitySchema.parse(doc)).not.toThrow();
@@ -38,7 +38,7 @@ describe('Identity Schema', () => {
       t: 'id' as const,
       n: 'Ѕhrike', // Cyrillic Ѕ
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
@@ -50,7 +50,7 @@ describe('Identity Schema', () => {
       t: 'id' as const,
       n: 'a'.repeat(65),
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
@@ -61,7 +61,7 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
@@ -73,7 +73,7 @@ describe('Identity Schema', () => {
       t: 'id' as const,
       n: 'Shrike',
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
     };
     expect(() => IdentityUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -84,7 +84,7 @@ describe('Identity Schema', () => {
       t: 'id' as const,
       n: 'Shrike',
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
       m: {
         links: [['twitter', '@shrikey_'], ['github', 'ShrikeBot']],
@@ -102,7 +102,7 @@ describe('Attestation Schema', () => {
       t: 'att' as const,
       from: { f: FAKE_FP, ref: FAKE_REF },
       to: { f: FAKE_FP, ref: FAKE_REF },
-      c: NOW,
+      ts: NOW,
     };
     expect(() => AttestationUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -115,7 +115,7 @@ describe('Revocation Schema', () => {
       t: 'revoke' as const,
       target: { f: FAKE_FP, ref: FAKE_REF },
       reason: 'key-compromised' as const,
-      c: NOW,
+      ts: NOW,
     };
     expect(() => RevocationUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -126,7 +126,7 @@ describe('Revocation Schema', () => {
       t: 'revoke' as const,
       target: { f: FAKE_FP, ref: FAKE_REF },
       reason: 'bored',
-      c: NOW,
+      ts: NOW,
     };
     expect(() => RevocationUnsignedSchema.parse(doc)).toThrow();
   });
@@ -141,7 +141,7 @@ describe('Supersession Schema', () => {
       n: 'Shrike',
       k: { t: 'ed25519', p: FAKE_PUB },
       reason: 'key-rotation' as const,
-      c: NOW,
+      ts: NOW,
     };
     expect(() => SupersessionUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -155,7 +155,7 @@ describe('Heartbeat Schema', () => {
       f: FAKE_FP,
       ref: FAKE_REF,
       seq: 0,
-      c: NOW,
+      ts: NOW,
     };
     expect(() => HeartbeatUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -167,7 +167,7 @@ describe('Heartbeat Schema', () => {
       f: FAKE_FP,
       ref: FAKE_REF,
       seq: 1,
-      c: NOW,
+      ts: NOW,
       msg: 'still alive',
     };
     expect(() => HeartbeatUnsignedSchema.parse(doc)).not.toThrow();
@@ -185,7 +185,7 @@ describe('Receipt Schema', () => {
       ],
       ex: { type: 'service', sum: 'Test exchange' },
       out: 'completed',
-      c: NOW,
+      ts: NOW,
     };
     expect(() => ReceiptUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -198,7 +198,7 @@ describe('Attestation Revocation Schema', () => {
       t: 'att-revoke' as const,
       ref: FAKE_REF,
       reason: 'retracted' as const,
-      c: NOW,
+      ts: NOW,
     };
     expect(() => AttRevocationUnsignedSchema.parse(doc)).not.toThrow();
   });
@@ -209,7 +209,7 @@ describe('Attestation Revocation Schema', () => {
       t: 'att-revoke' as const,
       ref: { id: 'a'.repeat(64) },
       reason: 'retracted' as const,
-      c: NOW,
+      ts: NOW,
     };
     expect(() => AttRevocationUnsignedSchema.parse(doc)).toThrow();
   });
@@ -222,7 +222,7 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       t: 'id' as const,
       n: 'Test',
       k: { t: 'ed25519', p: FAKE_PUB },
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => AtpDocumentSchema.parse(doc)).not.toThrow();
@@ -235,7 +235,7 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       f: FAKE_FP,
       ref: FAKE_REF,
       seq: 42,
-      c: NOW,
+      ts: NOW,
       s: FAKE_SIG,
     };
     expect(() => AtpDocumentSchema.parse(doc)).not.toThrow();

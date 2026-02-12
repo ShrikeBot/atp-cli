@@ -50,11 +50,15 @@ const verifyCmd = new Command('verify')
       process.exit(1);
     }
 
-    try {
-      validateTimestamp(doc.c as number, 'Document');
-      console.log(`Timestamp: ${new Date((doc.c as number) * 1000).toISOString()} ✓`);
-    } catch (e) {
-      console.warn(`⚠ ${(e as Error).message}`);
+    if (doc.ts != null) {
+      try {
+        validateTimestamp(doc.ts as number, 'Document');
+        console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
+      } catch (e) {
+        console.warn(`⚠ ${(e as Error).message}`);
+      }
+    } else {
+      console.log(`Timestamp: not present (optional)`);
     }
 
     console.log(`Document type: ${doc.t}`);

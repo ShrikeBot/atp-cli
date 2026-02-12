@@ -12,7 +12,7 @@ describe('Signing and Verification', () => {
       t: 'id',
       n: 'TestAgent',
       k: { t: 'ed25519', p: toBase64url(publicKey) },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
 
     const sig = sign(doc, privateKey, 'json');
@@ -30,7 +30,7 @@ describe('Signing and Verification', () => {
       t: 'id',
       n: 'TestAgent',
       k: { t: 'ed25519', p: toBase64url(publicKey) },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
 
     const sig = sign(doc, privateKey, 'json');
@@ -47,7 +47,7 @@ describe('Signing and Verification', () => {
       t: 'id',
       n: 'Alice',
       k: { t: 'ed25519', p: toBase64url(alice.publicKey) },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
 
     const sig = sign(doc, alice.privateKey, 'json');
@@ -62,7 +62,7 @@ describe('Signing and Verification', () => {
       t: 'id',
       n: 'TestAgent',
       k: { t: 'ed25519', p: toBase64url(publicKey) },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
 
     const sig = sign(doc, privateKey, 'cbor');
@@ -77,7 +77,7 @@ describe('Signing and Verification', () => {
       t: 'id',
       n: 'TestAgent',
       k: { t: 'ed25519', p: toBase64url(publicKey) },
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
 
     const jsonSig = sign(doc, privateKey, 'json');

@@ -26,7 +26,7 @@ describe('JSON Canonical Encoding', () => {
 
 describe('CBOR Encoding', () => {
   it('round-trips a document', () => {
-    const doc = { v: '1.0', t: 'id', n: 'Test', c: 1234567890 };
+    const doc = { v: '1.0', t: 'id', n: 'Test', ts: 1234567890 };
     const encoded = cborEncode(doc);
     const decoded = cborDecode(encoded);
     expect(decoded).toEqual(doc);
@@ -35,7 +35,7 @@ describe('CBOR Encoding', () => {
 
 describe('encodeForSigning', () => {
   it('strips the signature field and prepends domain separator', () => {
-    const doc = { v: '1.0', t: 'id', n: 'Test', c: 123, s: 'fakesig' };
+    const doc = { v: '1.0', t: 'id', n: 'Test', ts: 123, s: 'fakesig' };
     const bytes = encodeForSigning(doc, 'json');
     const str = bytes.toString('utf8');
     expect(str).toMatch(/^ATP-v1\.0:/);
@@ -46,7 +46,7 @@ describe('encodeForSigning', () => {
   });
 
   it('produces deterministic output', () => {
-    const doc = { c: 123, v: '1.0', t: 'id', n: 'Test' };
+    const doc = { ts: 123, v: '1.0', t: 'id', n: 'Test' };
     const a = encodeForSigning(doc, 'json');
     const b = encodeForSigning(doc, 'json');
     expect(a.equals(b)).toBe(true);

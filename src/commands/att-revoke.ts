@@ -30,9 +30,9 @@ const attRevoke = new Command('att-revoke')
       t: 'att-revoke',
       ref: { net, id: txid },
       reason: opts.reason,
-      c: Math.floor(Date.now() / 1000),
+      ts: Math.floor(Date.now() / 1000),
     };
-    validateTimestamp(doc.c as number, 'Attestation revocation');
+    validateTimestamp(doc.ts as number, 'Attestation revocation');
 
     // Validate before signing
     AttRevocationUnsignedSchema.parse(doc);

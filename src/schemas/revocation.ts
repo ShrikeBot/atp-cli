@@ -6,7 +6,7 @@ export const RevocationSchema = z.object({
   t: z.literal('revoke'),
   target: ReferenceSchema,
   reason: z.enum(['key-compromised', 'defunct']),
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: SignatureSchema,
 });
 

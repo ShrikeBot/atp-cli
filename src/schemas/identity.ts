@@ -13,7 +13,7 @@ export const IdentitySchema = z.object({
     .max(64)
     .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only (no Unicode homoglyphs)'),
   k: KeySchema,
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: SignatureSchema,
   m: MetadataSchema,
   sup: z.string().optional(),

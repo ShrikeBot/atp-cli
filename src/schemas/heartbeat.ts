@@ -7,7 +7,7 @@ export const HeartbeatSchema = z.object({
   f: z.string(),
   ref: LocationRefSchema,
   seq: z.number().int().nonnegative(),
-  c: TimestampSchema,
+  ts: TimestampSchema.optional(),
   s: SignatureSchema,
   msg: z.string().optional(),
 });
