@@ -284,10 +284,19 @@ const verifyCmd = new Command('verify')
             }
             const from = attDoc.from as { f: string; ref: { net: string; id: string } };
             console.log(`  Original attestor: ${from.f}`);
+            // Try the key at from.ref first (original signing key)
+            // Per spec §4.6, any successor key in the supersession chain may also sign.
+            // Full chain walking requires an explorer — CLI verifies against the ref'd key only.
             const resolved = await resolveIdentity(from.ref, rpcOpts);
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
+            if (!valid) {
+              console.error('  Signature does not match original attestor key.');
+              console.error('  Note: spec §4.6 allows successor keys in the supersession chain to revoke.');
+              console.error('  Full chain verification requires an explorer. Failing.');
+              process.exit(1);
+            }
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`);
