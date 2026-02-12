@@ -89,8 +89,8 @@ export function encodeForSigning(doc: Record<string, unknown>, format = 'json'):
   return Buffer.concat([separator, jsonCanonical(unsigned)]);
 }
 
-/** Maximum encoded document size (8 KB) */
-const MAX_DOCUMENT_SIZE = 8192;
+/** Maximum encoded document size (16 KB) */
+const MAX_DOCUMENT_SIZE = 16384;
 
 /** Encode complete document */
 export function encodeDocument(doc: Record<string, unknown>, format = 'json'): Buffer {
