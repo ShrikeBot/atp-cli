@@ -21,37 +21,37 @@ interface ResolvedKey {
 }
 
 /**
- * Fetch and decode an ATP document from a TXID (via RPC) or local file path.
+ * Fetch and decode an ATP document from a TXID via RPC.
+ * ref.id MUST be a valid TXID — no local file fallback.
+ * Document references are attacker-controlled input; never treat them as file paths.
  */
 async function fetchDoc(
   ref: { net: string; id: string },
   rpcOpts: RpcOpts,
 ): Promise<Record<string, unknown>> {
   const id = ref.id;
-  if (/^[0-9a-f]{64}$/i.test(id)) {
-    const rpc = new BitcoinRPC(rpcOpts.rpcUrl, rpcOpts.rpcUser, rpcOpts.rpcPass);
-    const tx = (await rpc.getRawTransaction(id)) as {
-      vin: Array<{ txinwitness?: string[] }>;
-    };
-    const witness = tx.vin[0]?.txinwitness;
-    if (!witness || witness.length === 0) throw new Error('No witness data in referenced tx');
-    let extracted: { contentType: string; data: Buffer } | null = null;
-    for (let i = witness.length - 1; i >= 0; i--) {
-      try {
-        extracted = extractInscriptionFromWitness(witness[i]!);
-        break;
-      } catch { /* try next */ }
-    }
-    if (!extracted) throw new Error('No inscription found in any witness element');
-    const { contentType, data } = extracted;
-    if (contentType.includes('cbor')) {
-      return cborDecode(data) as Record<string, unknown>;
-    }
-    return JSON.parse(data.toString('utf8'));
+  if (!/^[0-9a-f]{64}$/i.test(id)) {
+    throw new Error(`Invalid TXID in document reference: '${id}'`);
   }
-  // Try as local file
-  const raw = await readFile(id, 'utf8');
-  return JSON.parse(raw);
+  const rpc = new BitcoinRPC(rpcOpts.rpcUrl, rpcOpts.rpcUser, rpcOpts.rpcPass);
+  const tx = (await rpc.getRawTransaction(id)) as {
+    vin: Array<{ txinwitness?: string[] }>;
+  };
+  const witness = tx.vin[0]?.txinwitness;
+  if (!witness || witness.length === 0) throw new Error('No witness data in referenced tx');
+  let extracted: { contentType: string; data: Buffer } | null = null;
+  for (let i = witness.length - 1; i >= 0; i--) {
+    try {
+      extracted = extractInscriptionFromWitness(witness[i]!);
+      break;
+    } catch { /* try next */ }
+  }
+  if (!extracted) throw new Error('No inscription found in any witness element');
+  const { contentType, data } = extracted;
+  if (contentType.includes('cbor')) {
+    return cborDecode(data) as Record<string, unknown>;
+  }
+  return JSON.parse(data.toString('utf8'));
 }
 
 /**
@@ -130,9 +130,9 @@ const verifyCmd = new Command('verify')
       format = 'json';
     }
 
-    // Validate against schema
+    // Validate against schema — use parsed result to strip unknown fields
     try {
-      AtpDocumentSchema.parse(doc);
+      doc = AtpDocumentSchema.parse(doc) as Record<string, unknown>;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`Schema validation failed: ${msg}`);

@@ -16,7 +16,6 @@ const attest = new Command('attest')
   .requiredOption('--to-txid <txid>', 'Target identity inscription TXID')
   .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .option('--stake <sats>', 'Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)', parseInt)
-  .option('--stake-tx <txid>', 'TXID of stake transaction to treasury')
   .option('--claim <type>', 'Claim type: identity, capability, reliability', 'identity')
   .option('--context <text>', 'Context/reason for attestation')
   .option('--encoding <format>', 'json or cbor', 'json')
@@ -38,7 +37,6 @@ const attest = new Command('attest')
     validateTimestamp(doc.ts as number, 'Attestation');
 
     if (opts.stake) doc.stake = opts.stake;
-    if (opts.stakeTx) doc.stake_tx = opts.stakeTx;
     if (opts.context) doc.ctx = opts.context;
 
     // Validate before signing
