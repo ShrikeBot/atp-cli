@@ -127,8 +127,7 @@ const verifyCmd = new Command('verify')
         validateTimestamp(doc.ts as number, 'Document');
         console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
       } catch (e) {
-        console.error(`Error: ${(e as Error).message}`);
-        process.exit(1);
+        console.error(`Warning: ${(e as Error).message} (ts is advisory — block time is authoritative)`);
       }
     } else {
       console.log(`Timestamp: not present (optional)`);
