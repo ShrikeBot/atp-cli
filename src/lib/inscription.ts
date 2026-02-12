@@ -35,9 +35,6 @@ export function buildInscriptionEnvelope(data: Buffer, contentType: string): Buf
   for (let i = 0; i < data.length; i += 520) {
     const chunk = data.subarray(i, Math.min(i + 520, data.length));
     parts.push(pushData(chunk));
-    if (i + 520 < data.length) {
-      parts.push(Buffer.from([OP_FALSE]));
-    }
   }
 
   parts.push(Buffer.from([OP_ENDIF]));

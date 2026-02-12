@@ -2,10 +2,11 @@ import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
-import { sign } from '../lib/signing.js';
+import { sign, verify as verifySig } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { ReceiptUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
+import { resolveIdentity, fetchDoc } from './verify.js';
 
 const receipt = new Command('receipt').description('Receipt management');
 
@@ -78,6 +79,9 @@ receipt
   .requiredOption('--receipt <file>', 'Partial receipt file (with first signature)')
   .requiredOption('--identity <file>', 'Your identity file')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
+  .option('--rpc-url <url>', 'Bitcoin RPC URL', 'http://localhost:8332')
+  .option('--rpc-user <user>', 'RPC username', 'bitcoin')
+  .option('--rpc-pass <pass>', 'RPC password', '')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
   .action(async (opts: Record<string, string | undefined>) => {
@@ -105,7 +109,13 @@ receipt
       process.exit(1);
     }
 
-    // Verify the other party's signature before countersigning
+    const rpcOpts = {
+      rpcUrl: opts.rpcUrl ?? 'http://localhost:8332',
+      rpcUser: opts.rpcUser ?? 'bitcoin',
+      rpcPass: opts.rpcPass ?? '',
+    };
+
+    // Verify ALL other parties' signatures before countersigning
     const { s: _sigs, ...unsigned } = doc;
     for (let i = 0; i < parties.length; i++) {
       if (i === myIndex) continue;
@@ -113,47 +123,38 @@ receipt
         console.error(`Error: party ${i} (${parties[i].role}) has not signed yet`);
         process.exit(1);
       }
-      // Verify their signature
-      const otherPub = fromBase64url(parties[i].f);
-      // Fingerprint is not the public key — we need to resolve from the identity doc
-      // For now, trust that the receipt was created correctly; the inscription will fail
-      // verification if the first signature is invalid anyway.
-      console.error(`Party ${i} (${parties[i].role}) signature present: ${parties[i].f}`);
-    }
 
-    // Verify first party's signature by re-encoding unsigned doc
-    const otherIndex = myIndex === 0 ? 1 : 0;
-    if (sigs[otherIndex] && !sigs[otherIndex].startsWith('<')) {
-      const { verify: verifySig } = await import('../lib/signing.js');
-      // We need the other party's public key — attempt to load from ref if it's a local file
+      // Resolve identity via RPC — no local file fallback
+      let resolved;
       try {
-        const otherRef = parties[otherIndex].ref;
-        const otherDoc = JSON.parse(await readFile(otherRef.id, 'utf8'));
-        const otherK = Array.isArray(otherDoc.k) ? otherDoc.k[0] : otherDoc.k;
-        const otherPub = fromBase64url(otherK.p);
-        const otherFp = computeFingerprint(otherPub, otherK.t);
-        if (otherFp !== parties[otherIndex].f) {
-          console.error(`Error: party ${otherIndex} fingerprint mismatch — expected ${parties[otherIndex].f}, got ${otherFp}`);
-          process.exit(1);
-        }
-        const otherSigBytes = fromBase64url(sigs[otherIndex]);
-        const valid = verifySig(unsigned as Record<string, unknown>, otherPub, otherSigBytes, format);
-        if (!valid) {
-          console.error(`Error: party ${otherIndex} (${parties[otherIndex].role}) signature is INVALID — refusing to countersign`);
-          process.exit(1);
-        }
-        console.error(`Party ${otherIndex} (${parties[otherIndex].role}) signature: ✓ VALID`);
-      } catch {
-        console.error(`Warning: could not verify party ${otherIndex}'s signature (identity not available locally). Proceeding — inscription will fail if invalid.`);
+        resolved = await resolveIdentity(parties[i].ref, rpcOpts);
+      } catch (e) {
+        console.error(`Error: could not resolve party ${i}'s identity (${parties[i].f}): ${(e as Error).message}`);
+        console.error('Refusing to countersign without verified first signature.');
+        process.exit(1);
       }
+
+      // Verify fingerprint match
+      if (resolved.fingerprint !== parties[i].f) {
+        console.error(`Error: party ${i} fingerprint mismatch — expected ${parties[i].f}, resolved ${resolved.fingerprint}`);
+        process.exit(1);
+      }
+
+      // Verify signature
+      const otherSigBytes = fromBase64url(sigs[i]);
+      const valid = verifySig(unsigned as Record<string, unknown>, resolved.pubBytes, otherSigBytes, format, resolved.keyType);
+      if (!valid) {
+        console.error(`Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`);
+        process.exit(1);
+      }
+      console.error(`Party ${i} (${parties[i].role}) signature: ✓ VALID`);
     }
 
     // Sign
     const key = opts.privateKey
       ? await loadPrivateKeyFromFile(opts.privateKey, myK.t)
       : await loadPrivateKeyByFile(opts.identity!);
-    const { sign: signDoc } = await import('../lib/signing.js');
-    const sig = signDoc(unsigned as Record<string, unknown>, key.privateKey, format);
+    const sig = sign(unsigned as Record<string, unknown>, key.privateKey, format);
     sigs[myIndex] = format === 'cbor' ? sig as unknown as string : toBase64url(sig);
     doc.s = sigs;
 
