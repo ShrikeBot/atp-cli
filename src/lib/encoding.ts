@@ -89,8 +89,19 @@ export function encodeForSigning(doc: Record<string, unknown>, format = 'json'):
   return Buffer.concat([separator, jsonCanonical(unsigned)]);
 }
 
+/** Maximum encoded document size (8 KB) */
+const MAX_DOCUMENT_SIZE = 8192;
+
 /** Encode complete document */
 export function encodeDocument(doc: Record<string, unknown>, format = 'json'): Buffer {
-  if (format === 'cbor') return cborEncode(binaryFieldsToBuffers(doc));
-  return Buffer.from(JSON.stringify(sortKeys(doc), null, 2), 'utf8');
+  let output: Buffer;
+  if (format === 'cbor') {
+    output = cborEncode(binaryFieldsToBuffers(doc));
+  } else {
+    output = Buffer.from(JSON.stringify(sortKeys(doc), null, 2), 'utf8');
+  }
+  if (output.length > MAX_DOCUMENT_SIZE) {
+    throw new Error(`Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`);
+  }
+  return output;
 }
