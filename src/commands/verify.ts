@@ -158,8 +158,9 @@ const verifyCmd = new Command('verify')
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format);
             sigValid('Signature', valid, resolved.fingerprint);
-          } catch {
-            console.log("  Could not resolve attestor's identity. To verify, provide the attestor's public key via their identity document.");
+          } catch (e) {
+            console.error(`Error: could not resolve attestor's identity via ref: ${(e as Error).message}`);
+            process.exit(1);
           }
           break;
         }
@@ -180,8 +181,9 @@ const verifyCmd = new Command('verify')
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format);
             sigValid('Signature', valid, resolved.fingerprint);
-          } catch {
-            console.log('  Could not resolve identity. To verify, confirm the signature matches the identity with this fingerprint.');
+          } catch (e) {
+            console.error(`Error: could not resolve identity via ref: ${(e as Error).message}`);
+            process.exit(1);
           }
           break;
         }
@@ -208,8 +210,9 @@ const verifyCmd = new Command('verify')
             sigValid('Old key signature', oldValid, oldKey.fingerprint);
             const newValid = verify(doc, newPubBytes, newSigBytes, format);
             sigValid('New key signature', newValid, newFp);
-          } catch {
-            console.log('  Could not resolve old identity. Both old and new key signatures must be verified against their identity documents.');
+          } catch (e) {
+            console.error(`Error: could not resolve old identity via target.ref: ${(e as Error).message}`);
+            process.exit(1);
           }
           break;
         }
@@ -227,8 +230,9 @@ const verifyCmd = new Command('verify')
             if (!valid) {
               console.log('  Note: signer may be any key in the supersession chain. The target key was tried but failed.');
             }
-          } catch {
-            console.log('  Could not resolve target identity. Note: signer may be any key in the supersession chain.');
+          } catch (e) {
+            console.error(`Error: could not resolve target identity via target.ref: ${(e as Error).message}`);
+            process.exit(1);
           }
           break;
         }
@@ -251,8 +255,9 @@ const verifyCmd = new Command('verify')
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format);
             sigValid('Signature', valid, resolved.fingerprint);
-          } catch {
-            console.log("  Could not resolve original attestation. To verify, confirm the signature matches the original attestor's key.");
+          } catch (e) {
+            console.error(`Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`);
+            process.exit(1);
           }
           break;
         }
@@ -275,8 +280,9 @@ const verifyCmd = new Command('verify')
                 const sigBytes = fromBase64url(sigs[i]);
                 const valid = verify(doc, resolved.pubBytes, sigBytes, format);
                 sigValid(`  Party ${i} signature`, valid, resolved.fingerprint);
-              } catch {
-                console.log(`    Could not resolve party ${i}'s identity.`);
+              } catch (e) {
+                console.error(`Error: could not resolve party ${i}'s identity: ${(e as Error).message}`);
+                process.exit(1);
               }
             } else {
               console.log(`    Signature: <not yet provided>`);
