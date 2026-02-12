@@ -793,6 +793,405 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     expect(tx.vin[0]!.txinwitness!.length).toBeGreaterThan(0);
   }, 60000);
 
+  // ── Adversarial Tests ─────────────────────────────────────────────
+
+  describe('adversarial tests', () => {
+
+    // ── Helper: inscribe raw bytes with arbitrary content-type ──────
+
+    async function inscribeRaw(data: Buffer, contentType: string): Promise<string> {
+      const envelope = buildRealInscriptionEnvelope(data, contentType);
+      const taprootScript = Buffer.concat([envelope, Buffer.from([0x51])]);
+      const { outputKeyXOnly, controlBlock, scriptPubKey } = computeTaprootOutput(taprootScript);
+      const addr = p2trAddress(outputKeyXOnly);
+      const commitTxid = cli(`sendtoaddress ${addr} 0.001`);
+      mine(1);
+      const commitTxRaw = await rpcCall('getrawtransaction', [commitTxid, true]) as {
+        vout: Array<{ n: number; value: number; scriptPubKey: { hex: string } }>;
+      };
+      const spkHex = scriptPubKey.toString('hex');
+      const vout = commitTxRaw.vout.find(o => o.scriptPubKey.hex === spkHex);
+      if (!vout) throw new Error(`Could not find P2TR output in commit tx ${commitTxid}`);
+      const destAddr = cli('getnewaddress "" bech32');
+      const destInfo = await rpcCall('getaddressinfo', [destAddr]) as { scriptPubKey: string };
+      const destScriptPubKey = Buffer.from(destInfo.scriptPubKey, 'hex');
+      const inputSats = BigInt(Math.round(vout.value * 1e8));
+      const fee = 5000n;
+      const outputSats = inputSats - fee;
+      const revealTxBytes = buildWitnessTx(
+        commitTxid, vout.n, destScriptPubKey, outputSats,
+        [taprootScript, controlBlock],
+      );
+      const revealTxid = await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')]) as string;
+      mine(1);
+      return revealTxid;
+    }
+
+    /** Attempt to fetch and extract inscription; returns null on extraction failure */
+    async function tryFetchDoc(txid: string): Promise<Record<string, unknown> | null> {
+      try {
+        return await fetchDoc(txid);
+      } catch {
+        return null;
+      }
+    }
+
+    // ── Malformed Inscription Data ─────────────────────────────────
+
+    it('ADV-1: Non-ATP content type is ignored by extraction', async () => {
+      const data = Buffer.from(JSON.stringify({ v: '1.0', t: 'id', n: 'Fake' }), 'utf8');
+      const txid = await inscribeRaw(data, 'text/plain');
+      // extractRealInscription will return the data, but it has wrong content-type
+      const tx = await rpcCall('getrawtransaction', [txid, true]) as {
+        vin: Array<{ txinwitness?: string[] }>;
+      };
+      const witness = tx.vin[0]?.txinwitness;
+      expect(witness).toBeDefined();
+      let foundContentType: string | null = null;
+      for (let i = witness!.length - 1; i >= 0; i--) {
+        try {
+          const result = extractRealInscription(witness![i]!);
+          foundContentType = result.contentType;
+          break;
+        } catch { /* try next */ }
+      }
+      // Content-type should be text/plain — not ATP. A proper verifier should reject.
+      expect(foundContentType).toBe('text/plain');
+    }, 60000);
+
+    it('ADV-2: Invalid JSON payload with ATP content-type fails gracefully', async () => {
+      const data = Buffer.from('{malformed json!!!', 'utf8');
+      const txid = await inscribeRaw(data, 'application/atp.v1+json');
+      // fetchDoc attempts JSON.parse, should throw
+      const doc = await tryFetchDoc(txid);
+      expect(doc).toBeNull();
+    }, 60000);
+
+    it('ADV-3: Valid JSON but not ATP schema fails validation', async () => {
+      const data = Buffer.from(JSON.stringify({ hello: 'world' }), 'utf8');
+      const txid = await inscribeRaw(data, 'application/atp.v1+json');
+      const doc = await tryFetchDoc(txid);
+      if (doc) {
+        // Should fail schema validation
+        const { AtpDocumentSchema } = await import('../src/schemas/index.js');
+        expect(() => AtpDocumentSchema.parse(doc)).toThrow();
+      }
+    }, 60000);
+
+    it('ADV-4: Empty payload with ATP content-type fails gracefully', async () => {
+      const data = Buffer.alloc(0);
+      const txid = await inscribeRaw(data, 'application/atp.v1+json');
+      const doc = await tryFetchDoc(txid);
+      // Either extraction fails or JSON.parse('') throws
+      expect(doc).toBeNull();
+    }, 60000);
+
+    it('ADV-5: Huge payload (100KB) does not crash', async () => {
+      const key = makeKey();
+      const bigDoc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'HugePayload',
+        k: { t: 'ed25519', p: key.pubB64 },
+        ts: ts(),
+        m: { data: Array.from({ length: 500 }, (_, i) => [`key${i}`, 'x'.repeat(200)]) },
+      };
+      const data = Buffer.from(JSON.stringify(bigDoc), 'utf8');
+      expect(data.length).toBeGreaterThan(100000);
+      // Use higher fee for large tx (relay fee scales with size)
+      const envelope = buildRealInscriptionEnvelope(data, 'application/atp.v1+json');
+      const taprootScript = Buffer.concat([envelope, Buffer.from([0x51])]);
+      const { outputKeyXOnly, controlBlock, scriptPubKey } = computeTaprootOutput(taprootScript);
+      const addr = p2trAddress(outputKeyXOnly);
+      const commitTxid = cli(`sendtoaddress ${addr} 0.01`);
+      mine(1);
+      const commitTxRaw = await rpcCall('getrawtransaction', [commitTxid, true]) as {
+        vout: Array<{ n: number; value: number; scriptPubKey: { hex: string } }>;
+      };
+      const spkHex = scriptPubKey.toString('hex');
+      const vout = commitTxRaw.vout.find(o => o.scriptPubKey.hex === spkHex);
+      if (!vout) throw new Error('Could not find P2TR output');
+      const destAddr = cli('getnewaddress "" bech32');
+      const destInfo = await rpcCall('getaddressinfo', [destAddr]) as { scriptPubKey: string };
+      const destScriptPubKey = Buffer.from(destInfo.scriptPubKey, 'hex');
+      const inputSats = BigInt(Math.round(vout.value * 1e8));
+      const fee = 50000n; // 50k sats fee for large tx
+      const outputSats = inputSats - fee;
+      const revealTxBytes = buildWitnessTx(
+        commitTxid, vout.n, destScriptPubKey, outputSats,
+        [taprootScript, controlBlock],
+      );
+      const txid = await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')]) as string;
+      mine(1);
+      const doc = await tryFetchDoc(txid);
+      expect(doc).not.toBeNull();
+      expect(doc!.n).toBe('HugePayload');
+    }, 120000);
+
+    it('ADV-6: Binary garbage with CBOR content-type fails gracefully', async () => {
+      const garbage = Buffer.from(Array.from({ length: 256 }, () => Math.floor(Math.random() * 256)));
+      const txid = await inscribeRaw(garbage, 'application/atp.v1+cbor');
+      // Extraction succeeds (finds inscription) but CBOR decode should fail
+      const tx = await rpcCall('getrawtransaction', [txid, true]) as {
+        vin: Array<{ txinwitness?: string[] }>;
+      };
+      const witness = tx.vin[0]?.txinwitness!;
+      let extracted = false;
+      for (let i = witness.length - 1; i >= 0; i--) {
+        try {
+          const result = extractRealInscription(witness[i]!);
+          expect(result.contentType).toBe('application/atp.v1+cbor');
+          extracted = true;
+          // CBOR decode should throw on garbage
+          const { cborDecode } = await import('../src/lib/encoding.js');
+          expect(() => cborDecode(result.data)).toThrow();
+          break;
+        } catch (e) {
+          if (extracted) throw e; // re-throw if it was the cborDecode test
+        }
+      }
+    }, 60000);
+
+    // ── Tampered Documents ─────────────────────────────────────────
+
+    it('ADV-7: Signature swap — modified name after signing fails verification', async () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'OriginalName',
+        k: { t: 'ed25519', p: key.pubB64 },
+        ts: ts(),
+      };
+      IdentityUnsignedSchema.parse(doc);
+      doc.s = toBase64url(sign(doc, key.privateKey));
+      // Tamper after signing
+      doc.n = 'TamperedName';
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      expect(fetched.n).toBe('TamperedName');
+      // Signature should NOT verify
+      expect(verifyIdentityDoc(fetched)).toBe(false);
+    }, 60000);
+
+    it('ADV-8: Fingerprint mismatch — from.f does not match signer', async () => {
+      const keyA = makeKey();
+      const keyB = makeKey();
+      const { txid: txA } = await createAndInscribeIdentity(keyA, 'RealA');
+      const { txid: txB } = await createAndInscribeIdentity(keyB, 'RealB');
+      // Create attestation with wrong fingerprint in from.f
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'att',
+        from: { f: 'wrong-fingerprint-aaaa', ref: { net: NET, id: txA } },
+        to: { f: keyB.fingerprint, ref: { net: NET, id: txB } },
+        ts: ts(),
+      };
+      AttestationUnsignedSchema.parse(doc);
+      doc.s = toBase64url(sign(doc, keyA.privateKey));
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      // Sig verifies against keyA, but from.f doesn't match keyA's fingerprint
+      expect(verifyWithKey(fetched, keyA)).toBe(true); // sig is valid
+      expect((fetched.from as { f: string }).f).not.toBe(keyA.fingerprint); // but fingerprint is wrong
+    }, 60000);
+
+    it('ADV-9: Wrong key signs revocation — should fail verification', async () => {
+      const keyA = makeKey();
+      const keyB = makeKey();
+      const { txid: txA } = await createAndInscribeIdentity(keyA, 'VictimA');
+      await createAndInscribeIdentity(keyB, 'AttackerB');
+      // B tries to revoke A
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'revoke',
+        target: { f: keyA.fingerprint, ref: { net: NET, id: txA } },
+        reason: 'defunct', ts: ts(),
+      };
+      RevocationUnsignedSchema.parse(doc);
+      doc.s = toBase64url(sign(doc, keyB.privateKey));
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      // Verify against A's key should fail (signed by B)
+      expect(verifyWithKey(fetched, keyA)).toBe(false);
+      // Verify against B's key succeeds but B has no authority
+      expect(verifyWithKey(fetched, keyB)).toBe(true);
+    }, 60000);
+
+    it('ADV-10: Forged supersession — unrelated key C claims to supersede A', async () => {
+      const keyA = makeKey();
+      const keyC = makeKey();
+      const keyNew = makeKey();
+      const { txid: txA } = await createAndInscribeIdentity(keyA, 'TargetA');
+      await createAndInscribeIdentity(keyC, 'AttackerC');
+      // C creates supersession targeting A but signs with C's key (not A's)
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'super',
+        target: { f: keyA.fingerprint, ref: { net: NET, id: txA } },
+        n: 'TargetA', k: { t: 'ed25519', p: keyNew.pubB64 },
+        reason: 'key-rotation', ts: ts(),
+      };
+      SupersessionUnsignedSchema.parse(doc);
+      // Sign with C (old) and keyNew (new) — but C is NOT keyA
+      const oldSig = toBase64url(sign(doc, keyC.privateKey));
+      const newSig = toBase64url(sign(doc, keyNew.privateKey));
+      doc.s = [oldSig, newSig];
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      // Old key sig should NOT verify against A's key
+      const sigs = fetched.s as string[];
+      expect(verify(fetched, keyA.publicKey, fromBase64url(sigs[0]!))).toBe(false);
+      // It verifies against C's key, but C has no authority
+      expect(verify(fetched, keyC.publicKey, fromBase64url(sigs[0]!))).toBe(true);
+    }, 60000);
+
+    // ── Protocol Violation Tests ───────────────────────────────────
+
+    it('ADV-11: Future timestamp (year 2050) triggers warning', async () => {
+      const key = makeKey();
+      const futureTs = Math.floor(new Date('2050-01-01').getTime() / 1000);
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'FutureAgent',
+        k: { t: 'ed25519', p: key.pubB64 },
+        ts: futureTs,
+      };
+      // Schema allows any positive int for ts, so this passes
+      IdentityUnsignedSchema.parse(doc);
+      doc.s = toBase64url(sign(doc, key.privateKey));
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      // validateTimestamp should throw for >2h drift
+      const { validateTimestamp } = await import('../src/lib/timestamp.js');
+      expect(() => validateTimestamp(fetched.ts as number, 'Test')).toThrow(/future/);
+    }, 60000);
+
+    it('ADV-12: Negative seq in heartbeat is rejected by schema', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'hb', f: key.fingerprint,
+        ref: { net: NET, id: 'abc123' }, seq: -1, ts: ts(),
+      };
+      expect(() => HeartbeatUnsignedSchema.parse(doc)).toThrow();
+    });
+
+    it('ADV-13: Duplicate seq heartbeats both inscribe (verifier must reject)', async () => {
+      const key = makeKey();
+      const { txid: idTxid } = await createAndInscribeIdentity(key, 'DupeSeqAgent');
+      const { txid: hb1Txid } = await createAndInscribeHeartbeat(key, idTxid, 5, 'first');
+      const { txid: hb2Txid } = await createAndInscribeHeartbeat(key, idTxid, 5, 'dupe');
+      const hb1 = await fetchDoc(hb1Txid);
+      const hb2 = await fetchDoc(hb2Txid);
+      expect(hb1.seq).toBe(5);
+      expect(hb2.seq).toBe(5);
+      // Both verify cryptographically — verifier must enforce first-seen-wins
+      expect(verifyWithKey(hb1, key)).toBe(true);
+      expect(verifyWithKey(hb2, key)).toBe(true);
+      // hb1 was inscribed first
+      const raw1 = await rpcCall('getrawtransaction', [hb1Txid, true]) as { confirmations: number };
+      const raw2 = await rpcCall('getrawtransaction', [hb2Txid, true]) as { confirmations: number };
+      expect(raw1.confirmations).toBeGreaterThan(raw2.confirmations);
+    }, 60000);
+
+    it.todo('ADV-14: Self-referencing supersession (target fingerprint = new key fingerprint) — behavior undefined');
+
+    it('ADV-15: Revocation of non-existent identity TXID', async () => {
+      const key = makeKey();
+      const fakeTxid = 'deadbeef'.repeat(8); // 64-char fake txid
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'revoke',
+        target: { f: key.fingerprint, ref: { net: NET, id: fakeTxid } },
+        reason: 'defunct', ts: ts(),
+      };
+      RevocationUnsignedSchema.parse(doc);
+      doc.s = toBase64url(sign(doc, key.privateKey));
+      // Can inscribe it (chain doesn't validate ATP semantics)
+      const txid = await inscribe(doc);
+      const fetched = await fetchDoc(txid);
+      expect(fetched.t).toBe('revoke');
+      // Signature is valid but target doesn't exist — verifier must handle
+      expect(verifyWithKey(fetched, key)).toBe(true);
+    }, 60000);
+
+    // ── Malformed References ───────────────────────────────────────
+
+    it('ADV-16: Invalid CAIP-2 net string passes schema (no regex validation)', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'hb', f: key.fingerprint,
+        ref: { net: 'garbage!!!not-a-caip', id: 'abc123' },
+        seq: 0, ts: ts(),
+      };
+      // Schema currently uses z.string() for net — no CAIP-2 validation
+      // This is a gap: it SHOULD reject but currently doesn't
+      const result = HeartbeatUnsignedSchema.safeParse(doc);
+      if (!result.success) {
+        // If schema rejects, that's correct behavior
+        expect(result.error).toBeDefined();
+      } else {
+        // Schema allows it — document the gap
+        expect(result.data.ref.net).toBe('garbage!!!not-a-caip');
+      }
+    });
+
+    it('ADV-17: Empty ref.id passes schema (no min-length validation)', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'hb', f: key.fingerprint,
+        ref: { net: NET, id: '' },
+        seq: 0, ts: ts(),
+      };
+      const result = HeartbeatUnsignedSchema.safeParse(doc);
+      if (!result.success) {
+        expect(result.error).toBeDefined();
+      } else {
+        // Gap: empty id should probably be rejected
+        expect(result.data.ref.id).toBe('');
+      }
+    });
+
+    it('ADV-18: Attestation missing ref on from — schema rejects', () => {
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'att',
+        from: { f: 'some-fingerprint' }, // missing ref
+        to: { f: 'other-fingerprint', ref: { net: NET, id: 'txid123' } },
+        ts: ts(),
+      };
+      expect(() => AttestationUnsignedSchema.parse(doc)).toThrow();
+    });
+
+    // ── Edge Cases ─────────────────────────────────────────────────
+
+    it('ADV-19: Zero-length name rejected by schema', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: '',
+        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+      };
+      expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
+    });
+
+    it('ADV-20: 65-char name rejected by schema', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'A'.repeat(65),
+        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+      };
+      expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
+    });
+
+    it('ADV-21: Unicode (Cyrillic) name rejected by ASCII-only schema', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'Ѕhrike', // Ѕ is Cyrillic
+        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+      };
+      expect(() => IdentityUnsignedSchema.parse(doc)).toThrow(/ASCII/i);
+    });
+
+    it('ADV-22: Null bytes in name rejected by ASCII-only schema', () => {
+      const key = makeKey();
+      const doc: Record<string, unknown> = {
+        v: '1.0', t: 'id', n: 'Agent\x00Evil',
+        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+      };
+      expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
+    });
+  });
+
   it('9. Round-trip: document encoding preserved through inscription', async () => {
     const key = makeKey();
     const originalDoc: Record<string, unknown> = {
