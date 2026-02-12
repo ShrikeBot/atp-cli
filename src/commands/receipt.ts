@@ -5,7 +5,7 @@ import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
-import { ReceiptUnsignedSchema } from '../schemas/index.js';
+import { ReceiptUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
 const receipt = new Command('receipt').description('Receipt management');
 
@@ -14,8 +14,10 @@ receipt
   .description('Create a receipt document (initiator side)')
   .requiredOption('--from <file>', 'Your identity file')
   .requiredOption('--with <fingerprint>', 'Other party fingerprint')
+  .requiredOption('--from-txid <txid>', 'Your identity inscription TXID')
+  .requiredOption('--with-txid <txid>', 'Other party identity inscription TXID')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
-  .option('--with-key-type <type>', 'Other party key type', 'ed25519')
+  .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .requiredOption('--description <text>', 'Exchange description')
   .requiredOption('--type <type>', 'Exchange type: service, exchange, agreement')
   .option('--value <sats>', 'Value in sats', parseInt)
@@ -27,13 +29,14 @@ receipt
     const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
     const fromPub = fromBase64url(fromK.p);
     const fromFp = computeFingerprint(fromPub, fromK.t);
+    const net = (opts.net as string) ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'rcpt',
       p: [
-        { t: fromK.t, f: fromFp, role: 'initiator' },
-        { t: opts.withKeyType ?? 'ed25519', f: opts.with, role: 'counterparty' },
+        { f: fromFp, ref: { net, id: opts.fromTxid as string }, role: 'initiator' },
+        { f: opts.with as string, ref: { net, id: opts.withTxid as string }, role: 'counterparty' },
       ],
       ex: {
         type: opts.type,

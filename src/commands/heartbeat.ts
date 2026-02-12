@@ -5,13 +5,15 @@ import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
-import { HeartbeatUnsignedSchema } from '../schemas/index.js';
+import { HeartbeatUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
 const heartbeat = new Command('heartbeat')
   .description('Create a signed heartbeat proving liveness')
   .requiredOption('--from <file>', 'Your identity file')
   .requiredOption('--seq <n>', 'Sequence number (monotonically increasing)', parseInt)
+  .requiredOption('--txid <txid>', 'Your identity inscription TXID')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
+  .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .option('--msg <text>', 'Optional status message')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
@@ -20,11 +22,13 @@ const heartbeat = new Command('heartbeat')
     const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
     const fromPub = fromBase64url(fromK.p);
     const fp = computeFingerprint(fromPub, fromK.t);
+    const net = opts.net ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'hb',
       f: fp,
+      ref: { net, id: opts.txid as string },
       seq: opts.seq as unknown as number,
       c: Math.floor(Date.now() / 1000),
     };

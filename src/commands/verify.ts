@@ -73,25 +73,34 @@ const verifyCmd = new Command('verify')
       );
       console.log("To verify, provide the attestor's public key via their identity document.");
     } else if (doc.t === 'super') {
+      const target = doc.target as { f: string; ref: { net: string; id: string } };
+      const k = doc.k as { t: string; p: string };
+      const pubBytes = fromBase64url(k.p);
+      const newFp = computeFingerprint(pubBytes, k.t);
       console.log(
-        `Supersession: ${(doc.old as { f: string }).f} → ${(doc.new as { f: string }).f}`,
+        `Supersession: ${target.f} → ${newFp} (${doc.n})`,
       );
       console.log(`Reason: ${doc.reason}`);
+      console.log(`Target ref: ${target.ref.net} / ${target.ref.id}`);
       console.log(
         'Both old and new key signatures must be verified against their identity documents.',
       );
     } else if (doc.t === 'revoke') {
-      console.log(`Revocation of ${(doc.subject as { f: string }).f}`);
+      const target = doc.target as { f: string; ref: { net: string; id: string } };
+      console.log(`Revocation of ${target.f}`);
       console.log(`Reason: ${doc.reason}`);
-      // Note: the signer may be any key in the supersession chain, not just the current key
+      console.log(`Target ref: ${target.ref.net} / ${target.ref.id}`);
       console.log('Note: signer may be any key in the supersession chain.');
     } else if (doc.t === 'att-revoke') {
+      const ref = doc.ref as { net: string; id: string };
       console.log(`Attestation revocation`);
-      console.log(`Ref: ${doc.ref}`);
+      console.log(`Ref: ${ref.net} / ${ref.id}`);
       console.log(`Reason: ${doc.reason}`);
       console.log("To verify, confirm the signature matches the original attestor's key.");
     } else if (doc.t === 'hb') {
+      const ref = doc.ref as { net: string; id: string };
       console.log(`Heartbeat from ${doc.f}`);
+      console.log(`Ref: ${ref.net} / ${ref.id}`);
       if (doc.msg) console.log(`Message: ${doc.msg}`);
       console.log('To verify, confirm the signature matches the identity with this fingerprint.');
     } else {

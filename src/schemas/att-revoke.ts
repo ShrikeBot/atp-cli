@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, LocationRefSchema, SignatureSchema } from './common.js';
 
 export const AttRevocationSchema = z.object({
   v: VersionSchema,
   t: z.literal('att-revoke'),
-  ref: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 64 hex characters'),
+  ref: LocationRefSchema,
   reason: z.enum(['retracted', 'fraudulent', 'expired', 'error']),
   c: TimestampSchema,
   s: SignatureSchema,

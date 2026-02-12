@@ -4,7 +4,7 @@ import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureSchema } from
 export const RevocationSchema = z.object({
   v: VersionSchema,
   t: z.literal('revoke'),
-  subject: ReferenceSchema,
+  target: ReferenceSchema,
   reason: z.enum(['key-compromised', 'defunct']),
   c: TimestampSchema,
   s: SignatureSchema,

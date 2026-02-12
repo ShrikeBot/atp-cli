@@ -9,6 +9,7 @@ import {
   ReceiptUnsignedSchema,
   AttRevocationUnsignedSchema,
   AtpDocumentSchema,
+  BITCOIN_MAINNET,
 } from '../src/schemas/index.js';
 
 const FAKE_FP = 'erAHnt8G_oV4ANOborNzsAm2qSG_ikaQGA5cLpz8nVQ';
@@ -16,6 +17,7 @@ const FAKE_PUB = 'WhIcbyU-rzgEPkPr8mFPTyEhBpmDpz877NS_UGaOi4k';
 const FAKE_SIG =
   'NHDEGlU4HW5C54b5OWP8s_esxb3A2OQ594Cz3AW9pNYdVRB6hF2j8prlefrZYAwfe2gkhRieEXhzXDRZ0WrGAw';
 const NOW = Math.floor(Date.now() / 1000);
+const FAKE_REF = { net: BITCOIN_MAINNET, id: 'a'.repeat(64) };
 
 describe('Identity Schema', () => {
   it('validates a correct identity document', () => {
@@ -98,8 +100,8 @@ describe('Attestation Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'att' as const,
-      from: { t: 'ed25519', f: FAKE_FP },
-      to: { t: 'ed25519', f: FAKE_FP },
+      from: { f: FAKE_FP, ref: FAKE_REF },
+      to: { f: FAKE_FP, ref: FAKE_REF },
       c: NOW,
     };
     expect(() => AttestationUnsignedSchema.parse(doc)).not.toThrow();
@@ -111,7 +113,7 @@ describe('Revocation Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'revoke' as const,
-      subject: { t: 'ed25519', f: FAKE_FP },
+      target: { f: FAKE_FP, ref: FAKE_REF },
       reason: 'key-compromised' as const,
       c: NOW,
     };
@@ -122,7 +124,7 @@ describe('Revocation Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'revoke' as const,
-      subject: { t: 'ed25519', f: FAKE_FP },
+      target: { f: FAKE_FP, ref: FAKE_REF },
       reason: 'bored',
       c: NOW,
     };
@@ -135,8 +137,9 @@ describe('Supersession Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'super' as const,
-      old: { t: 'ed25519', f: FAKE_FP },
-      new: { t: 'ed25519', f: FAKE_FP },
+      target: { f: FAKE_FP, ref: FAKE_REF },
+      n: 'Shrike',
+      k: { t: 'ed25519', p: FAKE_PUB },
       reason: 'key-rotation' as const,
       c: NOW,
     };
@@ -150,6 +153,7 @@ describe('Heartbeat Schema', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      ref: FAKE_REF,
       seq: 0,
       c: NOW,
     };
@@ -161,6 +165,7 @@ describe('Heartbeat Schema', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      ref: FAKE_REF,
       seq: 1,
       c: NOW,
       msg: 'still alive',
@@ -175,8 +180,8 @@ describe('Receipt Schema', () => {
       v: '1.0' as const,
       t: 'rcpt' as const,
       p: [
-        { t: 'ed25519', f: FAKE_FP, role: 'initiator' },
-        { t: 'ed25519', f: FAKE_FP, role: 'counterparty' },
+        { f: FAKE_FP, ref: FAKE_REF, role: 'initiator' },
+        { f: FAKE_FP, ref: FAKE_REF, role: 'counterparty' },
       ],
       ex: { type: 'service', sum: 'Test exchange' },
       out: 'completed',
@@ -191,18 +196,18 @@ describe('Attestation Revocation Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'att-revoke' as const,
-      ref: 'a'.repeat(64),
+      ref: FAKE_REF,
       reason: 'retracted' as const,
       c: NOW,
     };
     expect(() => AttRevocationUnsignedSchema.parse(doc)).not.toThrow();
   });
 
-  it('rejects invalid TXID', () => {
+  it('rejects missing net field', () => {
     const doc = {
       v: '1.0' as const,
       t: 'att-revoke' as const,
-      ref: 'not-a-txid',
+      ref: { id: 'a'.repeat(64) },
       reason: 'retracted' as const,
       c: NOW,
     };
@@ -228,6 +233,7 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       v: '1.0' as const,
       t: 'hb' as const,
       f: FAKE_FP,
+      ref: FAKE_REF,
       seq: 42,
       c: NOW,
       s: FAKE_SIG,

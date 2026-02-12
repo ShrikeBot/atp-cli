@@ -19,17 +19,22 @@ export const KeySchema = z.object({
   role: z.string().optional(),
 });
 
+/** Location reference (platform-agnostic document locator) */
+export const LocationRefSchema = z.object({
+  net: z.string(),
+  id: z.string(),
+});
+
 /** Reference object (points to another identity) */
 export const ReferenceSchema = z.object({
-  t: z.string(),
   f: z.string(),
-  txid: z.string().optional(),
+  ref: LocationRefSchema,
 });
 
 /** Party in a receipt */
 export const PartySchema = z.object({
-  t: z.string(),
   f: z.string(),
+  ref: LocationRefSchema,
   role: z.string(),
 });
 
@@ -44,7 +49,11 @@ export const ExchangeSchema = z.object({
 export const ATP_MIME_JSON = 'application/atp.v1+json' as const;
 export const ATP_MIME_CBOR = 'application/atp.v1+cbor' as const;
 
+/** Bitcoin mainnet CAIP-2 identifier */
+export const BITCOIN_MAINNET = 'bip122:000000000019d6689c085ae165831e93' as const;
+
 export type Key = z.infer<typeof KeySchema>;
+export type LocationRef = z.infer<typeof LocationRefSchema>;
 export type Reference = z.infer<typeof ReferenceSchema>;
 export type Party = z.infer<typeof PartySchema>;
 export type Exchange = z.infer<typeof ExchangeSchema>;

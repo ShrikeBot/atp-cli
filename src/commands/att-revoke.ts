@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
-import { AttRevocationUnsignedSchema } from '../schemas/index.js';
+import { AttRevocationUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
 const attRevoke = new Command('att-revoke')
   .description('Revoke a previously issued attestation')
@@ -12,6 +12,7 @@ const attRevoke = new Command('att-revoke')
   .requiredOption('--from <file>', 'Your identity file (must be the original attestor)')
   .requiredOption('--reason <reason>', 'Reason: retracted, fraudulent, expired, error')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
+  .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
   .action(async (txid: string, opts: Record<string, string | undefined>) => {
@@ -22,11 +23,12 @@ const attRevoke = new Command('att-revoke')
 
     // Read identity to load key (needed for signing)
     await readFile(opts.from!, 'utf8');
+    const net = opts.net ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'att-revoke',
-      ref: txid,
+      ref: { net, id: txid },
       reason: opts.reason,
       c: Math.floor(Date.now() / 1000),
     };

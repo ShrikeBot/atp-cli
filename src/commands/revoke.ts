@@ -5,15 +5,16 @@ import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
-import { RevocationUnsignedSchema } from '../schemas/index.js';
+import { RevocationUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
 const revoke = new Command('revoke')
   .description('Revoke an identity permanently')
   .requiredOption('--identity <file>', 'Identity file to revoke')
   .requiredOption('--reason <reason>', 'Reason: key-compromised, defunct')
+  .requiredOption('--txid <txid>', 'Identity inscription TXID')
   .option('--key <file>', 'Key file to sign with (for chain revocation with an old key)')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
-  .option('--txid <txid>', 'Identity inscription TXID')
+  .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
   .action(async (opts: Record<string, string | undefined>) => {
@@ -21,11 +22,12 @@ const revoke = new Command('revoke')
     const k = Array.isArray(idDoc.k) ? idDoc.k[0] : idDoc.k;
     const pubBytes = fromBase64url(k.p);
     const fp = computeFingerprint(pubBytes, k.t);
+    const net = opts.net ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'revoke',
-      subject: { t: k.t, f: fp, ...(opts.txid && { txid: opts.txid }) },
+      target: { f: fp, ref: { net, id: opts.txid as string } },
       reason: opts.reason,
       c: Math.floor(Date.now() / 1000),
     };

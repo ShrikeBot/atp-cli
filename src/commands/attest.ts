@@ -5,14 +5,16 @@ import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
-import { AttestationUnsignedSchema } from '../schemas/index.js';
+import { AttestationUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
 const attest = new Command('attest')
   .description('Attest (vouch for) another agent')
   .argument('<fingerprint>', 'Target agent fingerprint')
   .requiredOption('--from <file>', 'Your identity file')
   .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
-  .option('--to-key-type <type>', 'Target key type', 'ed25519')
+  .requiredOption('--from-txid <txid>', 'Your identity inscription TXID')
+  .requiredOption('--to-txid <txid>', 'Target identity inscription TXID')
+  .option('--net <caip2>', 'CAIP-2 network identifier', BITCOIN_MAINNET)
   .option('--stake <sats>', 'Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)', parseInt)
   .option('--stake-tx <txid>', 'TXID of stake transaction to treasury')
   .option('--claim <type>', 'Claim type: identity, capability, reliability', 'identity')
@@ -24,12 +26,13 @@ const attest = new Command('attest')
     const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
     const fromPub = fromBase64url(fromK.p);
     const fromFp = computeFingerprint(fromPub, fromK.t);
+    const net = (opts.net as string) ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
       v: '1.0',
       t: 'att',
-      from: { t: fromK.t, f: fromFp },
-      to: { t: opts.toKeyType ?? 'ed25519', f: fingerprint },
+      from: { f: fromFp, ref: { net, id: opts.fromTxid as string } },
+      to: { f: fingerprint, ref: { net, id: opts.toTxid as string } },
       c: Math.floor(Date.now() / 1000),
     };
     validateTimestamp(doc.c as number, 'Attestation');
