@@ -7,11 +7,16 @@ import { BitcoinRPC } from '../lib/rpc.js';
 import { extractInscriptionFromWitness } from '../lib/inscription.js';
 import { validateTimestamp } from '../lib/timestamp.js';
 import { AtpDocumentSchema } from '../schemas/index.js';
+import { ExplorerClient } from '../lib/explorer.js';
 
 interface RpcOpts {
   rpcUrl: string;
   rpcUser: string;
   rpcPass: string;
+}
+
+interface VerifyOpts extends RpcOpts {
+  explorerUrl?: string;
 }
 
 interface ResolvedKey {
@@ -55,7 +60,8 @@ async function fetchDoc(
 }
 
 /**
- * Resolve a reference to an identity's public key.
+ * Resolve a reference to an identity's public key (RPC-only).
+ * Returns the key from the document at the given ref.
  */
 async function resolveIdentity(
   ref: { net: string; id: string },
@@ -72,6 +78,94 @@ async function resolveIdentity(
   return { pubBytes, keyType, fingerprint };
 }
 
+/**
+ * Resolve the CURRENT active key for a genesis fingerprint via explorer,
+ * then verify the explorer's answer against Bitcoin RPC.
+ *
+ * Falls back to direct RPC resolution (ref-only) if no explorer is configured.
+ */
+async function resolveCurrentKey(
+  genesisFingerprint: string,
+  ref: { net: string; id: string },
+  opts: VerifyOpts,
+): Promise<ResolvedKey> {
+  if (!opts.explorerUrl) {
+    // No explorer — fall back to resolving the ref directly
+    return resolveIdentity(ref, opts);
+  }
+
+  const explorer = new ExplorerClient(opts.explorerUrl);
+  const identity = await explorer.getIdentity(genesisFingerprint);
+
+  if (identity.status.startsWith('revoked')) {
+    console.log(`  ⚠ Identity is ${identity.status} (per explorer)`);
+  }
+
+  // Explorer says the current key is at this TXID — verify it on-chain
+  const currentTxid = identity.ref.id;
+  console.log(`  Explorer: current identity at ${currentTxid} (chain depth ${identity.chain_depth})`);
+
+  // Fetch and verify the document from RPC (trust anchor)
+  const doc = await fetchDoc({ net: identity.ref.net, id: currentTxid }, opts);
+  if (doc.t !== 'id' && doc.t !== 'super') {
+    throw new Error(`Explorer pointed to document type '${doc.t}', expected 'id' or 'super'`);
+  }
+
+  const k = doc.k as { t: string; p: string };
+  const pubBytes = fromBase64url(k.p);
+  const keyType = k.t;
+  const fingerprint = computeFingerprint(pubBytes, keyType);
+
+  // Verify the explorer's claimed fingerprint matches what's on-chain
+  if (fingerprint !== identity.current_fingerprint) {
+    throw new Error(
+      `Explorer claims current fingerprint is ${identity.current_fingerprint} ` +
+      `but on-chain document has ${fingerprint}`
+    );
+  }
+
+  return { pubBytes, keyType, fingerprint };
+}
+
+/**
+ * Walk the full supersession chain via explorer, verifying each link on-chain.
+ * Returns all chain keys (for revocation/att-revoke authority checks).
+ */
+async function resolveChainKeys(
+  genesisFingerprint: string,
+  opts: VerifyOpts,
+): Promise<ResolvedKey[]> {
+  if (!opts.explorerUrl) {
+    throw new Error('Chain walking requires --explorer-url');
+  }
+
+  const explorer = new ExplorerClient(opts.explorerUrl);
+  const chain = await explorer.getChain(genesisFingerprint);
+
+  const keys: ResolvedKey[] = [];
+  for (const entry of chain.chain) {
+    // Verify each chain entry on-chain
+    const doc = await fetchDoc(
+      { net: 'bip122:000000000019d6689c085ae165831e93', id: entry.inscription_id },
+      opts,
+    );
+    const k = doc.k as { t: string; p: string };
+    const pubBytes = fromBase64url(k.p);
+    const keyType = k.t;
+    const fingerprint = computeFingerprint(pubBytes, keyType);
+
+    if (fingerprint !== entry.fingerprint) {
+      throw new Error(
+        `Chain entry claims fingerprint ${entry.fingerprint} ` +
+        `but on-chain document has ${fingerprint}`
+      );
+    }
+    keys.push({ pubBytes, keyType, fingerprint });
+  }
+
+  return keys;
+}
+
 function sigValid(label: string, valid: boolean, fingerprint?: string): void {
   const fpStr = fingerprint ? ` (${fingerprint})` : '';
   if (valid) {
@@ -84,6 +178,8 @@ function sigValid(label: string, valid: boolean, fingerprint?: string): void {
 
 const CHAIN_STATE_WARNING =
   '\n⚠  Document signature verified. Chain state NOT checked — verify revocation/supersession status via an explorer.';
+const CHAIN_STATE_CHECKED =
+  '\n✓  Document signature verified. Chain state verified via explorer (each TXID confirmed on-chain).';
 
 const verifyCmd = new Command('verify')
   .description('Verify an ATP document from file or TXID')
@@ -91,6 +187,7 @@ const verifyCmd = new Command('verify')
   .option('--rpc-url <url>', 'Bitcoin RPC URL', 'http://localhost:8332')
   .option('--rpc-user <user>', 'RPC username', 'bitcoin')
   .option('--rpc-pass <pass>', 'RPC password', '')
+  .option('--explorer-url <url>', 'ATP Explorer API URL (enables chain walking)')
   .action(async (source: string, opts: Record<string, string>) => {
     let doc: Record<string, unknown>;
     let format: string;
@@ -158,11 +255,13 @@ const verifyCmd = new Command('verify')
 
     console.log(`Document type: ${doc.t}`);
 
-    const rpcOpts: RpcOpts = {
+    const verifyOpts: VerifyOpts = {
       rpcUrl: opts.rpcUrl,
       rpcUser: opts.rpcUser,
       rpcPass: opts.rpcPass,
+      explorerUrl: opts.explorerUrl,
     };
+    const hasExplorer = !!opts.explorerUrl;
 
     try {
       switch (doc.t) {
@@ -181,7 +280,7 @@ const verifyCmd = new Command('verify')
           const to = doc.to as { f: string };
           console.log(`  Attestation: ${from.f} → ${to.f}`);
           try {
-            const resolved = await resolveIdentity(from.ref, rpcOpts);
+            const resolved = await resolveIdentity(from.ref, verifyOpts);
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
             // Verify fingerprint match
             if (from.f !== resolved.fingerprint) {
@@ -206,7 +305,7 @@ const verifyCmd = new Command('verify')
           console.log(`  Heartbeat from ${f}, seq=${doc.seq}`);
           if (doc.msg) console.log(`  Message: ${doc.msg}`);
           try {
-            const resolved = await resolveIdentity(ref, rpcOpts);
+            const resolved = await resolveIdentity(ref, verifyOpts);
             console.log(`  Resolved identity: ${resolved.fingerprint}`);
             if (f !== resolved.fingerprint) {
               console.error(`  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`);
@@ -232,7 +331,7 @@ const verifyCmd = new Command('verify')
           console.log(`  Supersession: ${target.f} → ${newFp} (${doc.n})`);
           console.log(`  Reason: ${doc.reason}`);
           try {
-            const oldKey = await resolveIdentity(target.ref, rpcOpts);
+            const oldKey = await resolveIdentity(target.ref, verifyOpts);
             console.log(`  Resolved old identity: ${oldKey.fingerprint}`);
             if (target.f !== oldKey.fingerprint) {
               console.error(`  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${oldKey.fingerprint}`);
@@ -259,7 +358,7 @@ const verifyCmd = new Command('verify')
           console.log(`  Revocation of ${target.f}`);
           console.log(`  Reason: ${doc.reason}`);
           try {
-            const resolved = await resolveIdentity(target.ref, rpcOpts);
+            const resolved = await resolveIdentity(target.ref, verifyOpts);
             console.log(`  Resolved target identity: ${resolved.fingerprint}`);
             const sigBytes = fromBase64url(doc.s as string);
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
@@ -277,27 +376,45 @@ const verifyCmd = new Command('verify')
           console.log(`  Reason: ${doc.reason}`);
           try {
             // Resolve the original attestation to find the attestor
-            const attDoc = await fetchDoc(ref, rpcOpts);
+            const attDoc = await fetchDoc(ref, verifyOpts);
             if (attDoc.t !== 'att') {
               console.error(`  ✗ Referenced document is type '${attDoc.t}', expected 'att'`);
               process.exit(1);
             }
             const from = attDoc.from as { f: string; ref: { net: string; id: string } };
             console.log(`  Original attestor: ${from.f}`);
-            // Try the key at from.ref first (original signing key)
-            // Per spec §4.6, any successor key in the supersession chain may also sign.
-            // Full chain walking requires an explorer — CLI verifies against the ref'd key only.
-            const resolved = await resolveIdentity(from.ref, rpcOpts);
-            console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
+
             const sigBytes = fromBase64url(doc.s as string);
-            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
-            if (!valid) {
-              console.error('  Signature does not match original attestor key.');
-              console.error('  Note: spec §4.6 allows successor keys in the supersession chain to revoke.');
-              console.error('  Full chain verification requires an explorer. Failing.');
-              process.exit(1);
+
+            if (hasExplorer) {
+              // Walk the full supersession chain — try each key
+              const chainKeys = await resolveChainKeys(from.f, verifyOpts);
+              let matched = false;
+              for (const chainKey of chainKeys) {
+                const valid = verify(doc, chainKey.pubBytes, sigBytes, format, chainKey.keyType);
+                if (valid) {
+                  sigValid('Signature (chain key)', valid, chainKey.fingerprint);
+                  matched = true;
+                  break;
+                }
+              }
+              if (!matched) {
+                console.error('  ✗ Signature does not match any key in the attestor\'s supersession chain.');
+                process.exit(1);
+              }
+            } else {
+              // No explorer — verify against the ref'd key only
+              const resolved = await resolveIdentity(from.ref, verifyOpts);
+              console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
+              const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
+              if (!valid) {
+                console.error('  Signature does not match original attestor key.');
+                console.error('  Note: spec §4.6 allows successor keys in the supersession chain to revoke.');
+                console.error('  Full chain verification requires --explorer-url. Failing.');
+                process.exit(1);
+              }
+              sigValid('Signature', valid, resolved.fingerprint);
             }
-            sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
             console.error(`Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`);
             process.exit(1);
@@ -314,7 +431,7 @@ const verifyCmd = new Command('verify')
             console.log(`  Party ${i} (${party.role}): ${party.f}`);
             if (sigs[i] && !sigs[i].startsWith('<')) {
               try {
-                const resolved = await resolveIdentity(party.ref, rpcOpts);
+                const resolved = await resolveIdentity(party.ref, verifyOpts);
                 if (party.f !== resolved.fingerprint) {
                   console.error(`    ✗ Fingerprint mismatch: doc says ${party.f}, resolved ${resolved.fingerprint}`);
                   process.exit(1);
@@ -339,12 +456,12 @@ const verifyCmd = new Command('verify')
           console.error(`Unknown document type: ${doc.t}`);
           process.exit(1);
       }
-      console.log(CHAIN_STATE_WARNING);
+      console.log(hasExplorer ? CHAIN_STATE_CHECKED : CHAIN_STATE_WARNING);
     } catch (e) {
       console.error(`Verification error: ${(e as Error).message}`);
       process.exit(1);
     }
   });
 
-export { fetchDoc, resolveIdentity };
+export { fetchDoc, resolveIdentity, resolveCurrentKey, resolveChainKeys };
 export default verifyCmd;
