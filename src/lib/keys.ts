@@ -187,15 +187,18 @@ export async function loadPublicKeyFromFile(
   } catch (e) {
     if (e instanceof SyntaxError) {
       const text = raw.toString('utf8').trim();
-      if (raw.length === 32) {
+      const validSizes = [32, 33]; // 32 = ed25519, 33 = secp256k1 compressed
+      if (validSizes.includes(raw.length)) {
         pubBytes = Buffer.from(raw);
       } else if (/^[0-9a-fA-F]{64}$/.test(text)) {
+        pubBytes = Buffer.from(text, 'hex');
+      } else if (/^[0-9a-fA-F]{66}$/.test(text)) {
         pubBytes = Buffer.from(text, 'hex');
       } else {
         try {
           pubBytes = fromBase64url(text);
-          if (pubBytes.length !== 32) {
-            throw new Error(`Decoded key is ${pubBytes.length} bytes, expected 32`);
+          if (!validSizes.includes(pubBytes.length)) {
+            throw new Error(`Decoded key is ${pubBytes.length} bytes, expected 32 (ed25519) or 33 (secp256k1)`);
           }
         } catch {
           throw new Error('Cannot detect public key format');
