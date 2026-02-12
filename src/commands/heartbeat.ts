@@ -4,13 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { HeartbeatUnsignedSchema } from '../schemas/index.js';
 
 const heartbeat = new Command('heartbeat')
   .description('Create a signed heartbeat proving liveness')
   .requiredOption('--from <file>', 'Your identity file')
   .requiredOption('--seq <n>', 'Sequence number (monotonically increasing)', parseInt)
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
   .option('--msg <text>', 'Optional status message')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
@@ -34,7 +35,9 @@ const heartbeat = new Command('heartbeat')
     // Validate before signing
     HeartbeatUnsignedSchema.parse(doc);
 
-    const key = await loadPrivateKeyByFile(opts.from!);
+    const key = opts.privateKey
+      ? await loadPrivateKeyFromFile(opts.privateKey, fromK.t)
+      : await loadPrivateKeyByFile(opts.from!);
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);

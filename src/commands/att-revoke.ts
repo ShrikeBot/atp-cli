@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
 import { toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { AttRevocationUnsignedSchema } from '../schemas/index.js';
 
 const attRevoke = new Command('att-revoke')
@@ -11,6 +11,7 @@ const attRevoke = new Command('att-revoke')
   .argument('<txid>', 'TXID of the attestation to revoke')
   .requiredOption('--from <file>', 'Your identity file (must be the original attestor)')
   .requiredOption('--reason <reason>', 'Reason: retracted, fraudulent, expired, error')
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
   .action(async (txid: string, opts: Record<string, string | undefined>) => {
@@ -34,7 +35,9 @@ const attRevoke = new Command('att-revoke')
     // Validate before signing
     AttRevocationUnsignedSchema.parse(doc);
 
-    const key = await loadPrivateKeyByFile(opts.from!);
+    const key = opts.privateKey
+      ? await loadPrivateKeyFromFile(opts.privateKey)
+      : await loadPrivateKeyByFile(opts.from!);
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);

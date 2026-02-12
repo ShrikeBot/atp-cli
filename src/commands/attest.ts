@@ -4,13 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { AttestationUnsignedSchema } from '../schemas/index.js';
 
 const attest = new Command('attest')
   .description('Attest (vouch for) another agent')
   .argument('<fingerprint>', 'Target agent fingerprint')
   .requiredOption('--from <file>', 'Your identity file')
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
   .option('--to-key-type <type>', 'Target key type', 'ed25519')
   .option('--stake <sats>', 'Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)', parseInt)
   .option('--stake-tx <txid>', 'TXID of stake transaction to treasury')
@@ -40,7 +41,9 @@ const attest = new Command('attest')
     // Validate before signing
     AttestationUnsignedSchema.parse(doc);
 
-    const key = await loadPrivateKeyByFile(opts.from as string);
+    const key = opts.privateKey
+      ? await loadPrivateKeyFromFile(opts.privateKey as string, fromK.t)
+      : await loadPrivateKeyByFile(opts.from as string);
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, key.privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);

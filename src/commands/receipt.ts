@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { ReceiptUnsignedSchema } from '../schemas/index.js';
 
 const receipt = new Command('receipt').description('Receipt management');
@@ -14,6 +14,7 @@ receipt
   .description('Create a receipt document (initiator side)')
   .requiredOption('--from <file>', 'Your identity file')
   .requiredOption('--with <fingerprint>', 'Other party fingerprint')
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
   .option('--with-key-type <type>', 'Other party key type', 'ed25519')
   .requiredOption('--description <text>', 'Exchange description')
   .requiredOption('--type <type>', 'Exchange type: service, exchange, agreement')
@@ -47,7 +48,9 @@ receipt
     // Validate before signing
     ReceiptUnsignedSchema.parse(doc);
 
-    const key = await loadPrivateKeyByFile(opts.from as string);
+    const key = opts.privateKey
+      ? await loadPrivateKeyFromFile(opts.privateKey as string, fromK.t)
+      : await loadPrivateKeyByFile(opts.from as string);
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, key.privateKey, format);
 

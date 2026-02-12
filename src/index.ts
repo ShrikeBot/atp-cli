@@ -9,6 +9,7 @@ import attest from './commands/attest.js';
 import attRevoke from './commands/att-revoke.js';
 import heartbeat from './commands/heartbeat.js';
 import receipt from './commands/receipt.js';
+import key from './commands/key.js';
 
 // Re-export schemas for library consumers
 export * from './schemas/index.js';
@@ -28,5 +29,6 @@ program.addCommand(attest);
 program.addCommand(attRevoke);
 program.addCommand(heartbeat);
 program.addCommand(receipt);
+program.addCommand(key);
 
 program.parse();

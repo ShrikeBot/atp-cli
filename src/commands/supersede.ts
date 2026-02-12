@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { SupersessionUnsignedSchema } from '../schemas/index.js';
 
 const supersede = new Command('supersede')
@@ -12,6 +12,9 @@ const supersede = new Command('supersede')
   .requiredOption('--old <file>', 'Old identity file')
   .requiredOption('--new <file>', 'New identity file')
   .requiredOption('--reason <reason>', 'Reason: key-rotation, algorithm-upgrade, key-compromised')
+  .option('--old-private-key <file>', 'Old private key file (overrides key lookup)')
+  .option('--new-private-key <file>', 'New private key file (overrides key lookup)')
+  .option('--private-key <file>', 'Private key file for old key (alias for --old-private-key)')
   .option('--old-txid <txid>', 'Old identity inscription TXID')
   .option('--new-txid <txid>', 'New identity inscription TXID')
   .option('--encoding <format>', 'json or cbor', 'json')
@@ -41,8 +44,13 @@ const supersede = new Command('supersede')
     // Validate before signing
     SupersessionUnsignedSchema.parse(doc);
 
-    const oldKey = await loadPrivateKeyByFile(opts.old!);
-    const newKey = await loadPrivateKeyByFile(opts.new!);
+    const oldPrivKeyFile = opts.oldPrivateKey ?? opts.privateKey;
+    const oldKey = oldPrivKeyFile
+      ? await loadPrivateKeyFromFile(oldPrivKeyFile, oldK.t)
+      : await loadPrivateKeyByFile(opts.old!);
+    const newKey = opts.newPrivateKey
+      ? await loadPrivateKeyFromFile(opts.newPrivateKey, newK.t)
+      : await loadPrivateKeyByFile(opts.new!);
 
     const format = opts.encoding ?? 'json';
     const oldSig = sign(doc, oldKey.privateKey, format);

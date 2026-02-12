@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
-import { loadPrivateKeyByFile } from '../lib/keys.js';
+import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { RevocationUnsignedSchema } from '../schemas/index.js';
 
 const revoke = new Command('revoke')
@@ -12,6 +12,7 @@ const revoke = new Command('revoke')
   .requiredOption('--identity <file>', 'Identity file to revoke')
   .requiredOption('--reason <reason>', 'Reason: key-compromised, defunct')
   .option('--key <file>', 'Key file to sign with (for chain revocation with an old key)')
+  .option('--private-key <file>', 'Private key file (overrides key lookup from identity)')
   .option('--txid <txid>', 'Identity inscription TXID')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
@@ -33,9 +34,14 @@ const revoke = new Command('revoke')
     // Validate before signing
     RevocationUnsignedSchema.parse(doc);
 
-    const key = opts.key
-      ? await loadPrivateKeyByFile(opts.key)
-      : await loadPrivateKeyByFile(opts.identity!);
+    let key;
+    if (opts.privateKey) {
+      key = await loadPrivateKeyFromFile(opts.privateKey, k.t);
+    } else if (opts.key) {
+      key = await loadPrivateKeyByFile(opts.key);
+    } else {
+      key = await loadPrivateKeyByFile(opts.identity!);
+    }
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);

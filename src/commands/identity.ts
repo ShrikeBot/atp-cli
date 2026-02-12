@@ -1,12 +1,13 @@
 import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
-import { generateKeypair } from '../lib/keys.js';
+import { generateKeypair, loadPrivateKeyFromFile, loadPublicKeyFromFile, saveKeypair } from '../lib/keys.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { toBase64url, fromBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
 import { buildInscriptionEnvelope } from '../lib/inscription.js';
 import { IdentityUnsignedSchema } from '../schemas/index.js';
+import { ed25519 } from '@noble/curves/ed25519';
 
 const identity = new Command('identity').description('Identity management');
 
@@ -15,6 +16,9 @@ identity
   .description('Generate Ed25519 keypair and build identity document')
   .requiredOption('--name <name>', 'Agent name')
   .option('--key <type>', 'Key type', 'ed25519')
+  .option('--private-key <file>', 'Use existing private key file instead of generating one')
+  .option('--public-key <file>', 'Use existing public key file')
+  .option('--no-save', 'Do not save keypair to ~/.atp/keys/')
   .option('--handle-twitter <handle>', 'Twitter handle')
   .option('--handle-moltbook <handle>', 'Moltbook handle')
   .option('--handle-github <handle>', 'GitHub handle')
@@ -22,15 +26,50 @@ identity
   .option('--wallet <address>', 'Bitcoin payment address')
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
-  .action(async (opts: Record<string, string | undefined>) => {
-    const { privateKey, publicKey, fingerprint, keyFile } = await generateKeypair(
-      opts.key ?? 'ed25519',
-    );
-    console.error(`Key generated. Fingerprint: ${fingerprint}`);
-    console.error(`Private key saved to: ${keyFile}`);
+  .action(async (opts: Record<string, string | boolean | undefined>) => {
+    const keyType = (opts.key as string) ?? 'ed25519';
+    let privateKey: Buffer;
+    let publicKey: Buffer;
+    let fingerprint: string;
+
+    if (opts.publicKey && !opts.privateKey) {
+      console.error('Error: --public-key requires --private-key (need private key to sign)');
+      process.exit(1);
+    }
+
+    if (opts.privateKey) {
+      // Load from provided private key file
+      const keyData = await loadPrivateKeyFromFile(opts.privateKey as string, keyType);
+      privateKey = keyData.privateKey;
+      publicKey = keyData.publicKey;
+      fingerprint = keyData.fingerprint;
+
+      // Validate against public key if provided
+      if (opts.publicKey) {
+        const pubData = await loadPublicKeyFromFile(opts.publicKey as string, keyType);
+        if (!pubData.publicKey.equals(publicKey)) {
+          console.error('Error: --public-key does not match the public key derived from --private-key');
+          process.exit(1);
+        }
+      }
+
+      if (opts.save !== false) {
+        const keyFile = await saveKeypair(privateKey, publicKey, keyType);
+        console.error(`Key saved to: ${keyFile}`);
+      }
+      console.error(`Using provided key. Fingerprint: ${fingerprint}`);
+    } else {
+      // Generate new keypair
+      const kp = await generateKeypair(keyType);
+      privateKey = kp.privateKey;
+      publicKey = kp.publicKey;
+      fingerprint = kp.fingerprint;
+      console.error(`Key generated. Fingerprint: ${fingerprint}`);
+      console.error(`Private key saved to: ${kp.keyFile}`);
+    }
 
     // Validate name: ASCII only, 1-64 chars
-    const name = opts.name!;
+    const name = opts.name as string;
     if (!/^[\x20-\x7E]{1,64}$/.test(name)) {
       console.error('Error: Name must be 1-64 ASCII characters (no Unicode/homoglyphs)');
       process.exit(1);
@@ -41,7 +80,7 @@ identity
       t: 'id',
       n: name,
       k: {
-        t: opts.key ?? 'ed25519',
+        t: keyType,
         p: toBase64url(publicKey),
       },
       c: Math.floor(Date.now() / 1000),
@@ -51,23 +90,23 @@ identity
     if (opts.wallet) doc.w = opts.wallet;
 
     const meta: Record<string, string> = {};
-    if (opts.handleTwitter) meta.twitter = opts.handleTwitter;
-    if (opts.handleMoltbook) meta.moltbook = opts.handleMoltbook;
-    if (opts.handleGithub) meta.github = opts.handleGithub;
-    if (opts.handleNostr) meta.nostr = opts.handleNostr;
+    if (opts.handleTwitter) meta.twitter = opts.handleTwitter as string;
+    if (opts.handleMoltbook) meta.moltbook = opts.handleMoltbook as string;
+    if (opts.handleGithub) meta.github = opts.handleGithub as string;
+    if (opts.handleNostr) meta.nostr = opts.handleNostr as string;
     if (Object.keys(meta).length > 0) doc.m = meta;
 
     // Validate before signing
     IdentityUnsignedSchema.parse(doc);
 
-    const format = opts.encoding ?? 'json';
+    const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, privateKey, format);
     doc.s = format === 'cbor' ? sig : toBase64url(sig);
 
     const output = encodeDocument(doc, format);
 
     if (opts.output) {
-      await writeFile(opts.output, output);
+      await writeFile(opts.output as string, output);
       console.error(`Identity written to: ${opts.output}`);
     } else {
       if (format === 'cbor') {
