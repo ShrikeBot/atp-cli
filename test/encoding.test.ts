@@ -34,15 +34,32 @@ describe('CBOR Encoding', () => {
 });
 
 describe('encodeForSigning', () => {
-  it('strips the signature field and prepends domain separator', () => {
+  it('strips the signature field and prepends domain separator with doc type', () => {
     const doc = { v: '1.0', t: 'id', n: 'Test', ts: 123, s: 'fakesig' };
     const bytes = encodeForSigning(doc, 'json');
     const str = bytes.toString('utf8');
-    expect(str).toMatch(/^ATP-v1\.0:/);
-    const jsonPart = str.slice('ATP-v1.0:'.length);
+    expect(str).toMatch(/^ATP-v1\.0:id:/);
+    const jsonPart = str.slice('ATP-v1.0:id:'.length);
     const parsed = JSON.parse(jsonPart);
     expect(parsed).not.toHaveProperty('s');
     expect(parsed).toHaveProperty('v', '1.0');
+  });
+
+  it('uses correct domain separator for each document type', () => {
+    const types = [
+      ['id', 'ATP-v1.0:id:'],
+      ['att', 'ATP-v1.0:att:'],
+      ['super', 'ATP-v1.0:super:'],
+      ['revoke', 'ATP-v1.0:revoke:'],
+      ['hb', 'ATP-v1.0:hb:'],
+      ['rcpt', 'ATP-v1.0:rcpt:'],
+      ['att-revoke', 'ATP-v1.0:att-revoke:'],
+    ];
+    for (const [t, prefix] of types) {
+      const doc = { v: '1.0', t, ts: 123 };
+      const bytes = encodeForSigning(doc, 'json');
+      expect(bytes.toString('utf8').startsWith(prefix!)).toBe(true);
+    }
   });
 
   it('produces deterministic output', () => {
