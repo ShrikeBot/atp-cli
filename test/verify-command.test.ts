@@ -57,6 +57,16 @@ async function runVerify(path: string, rpcUrl: string, explorerUrl?: string): Pr
   }
 }
 
+/** Build identity doc with new format */
+function buildIdDoc(key: KeyPair, name: string): Record<string, unknown> {
+  const doc: Record<string, unknown> = {
+    v: '1.0', t: 'id', n: name,
+    k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
+  };
+  doc.s = { f: key.fingerprint, sig: toBase64url(sign(doc, key.privateKey)) };
+  return doc;
+}
+
 describe('Verify command', () => {
 
 let rpc: MockRPC;
@@ -83,11 +93,7 @@ describe('identity document', () => {
 
   it('verifies valid identity (no explorer)', async () => {
     const key = makeKey();
-    const doc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'TestAgent',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    doc.s = toBase64url(sign(doc, key.privateKey));
+    const doc = buildIdDoc(key, 'TestAgent');
     const out = await runVerify(writeDoc('id.json', doc), rpc.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state NOT checked');
@@ -95,11 +101,7 @@ describe('identity document', () => {
 
   it('verifies valid identity (with explorer)', async () => {
     const key = makeKey();
-    const doc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'TestAgent2',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    doc.s = toBase64url(sign(doc, key.privateKey));
+    const doc = buildIdDoc(key, 'TestAgent2');
     const out = await runVerify(writeDoc('id2.json', doc), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state verified via explorer');
@@ -107,11 +109,7 @@ describe('identity document', () => {
 
   it('detects tampered identity', async () => {
     const key = makeKey();
-    const doc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'TestAgent',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    doc.s = toBase64url(sign(doc, key.privateKey));
+    const doc = buildIdDoc(key, 'TestAgent');
     doc.n = 'Tampered';
     const out = await runVerify(writeDoc('id-bad.json', doc), rpc.url);
     expect(out).toContain('✗ INVALID');
@@ -126,12 +124,7 @@ describe('attestation', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    // Store attestor identity as inscription
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Attestor',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'Attestor');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -140,7 +133,7 @@ describe('attestation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'a'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const out = await runVerify(writeDoc('att.json', att), rpc.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Fingerprint match: ✓');
@@ -151,11 +144,7 @@ describe('attestation', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Attestor',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'Attestor');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -164,7 +153,7 @@ describe('attestation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'b'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const out = await runVerify(writeDoc('att-exp.json', att), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state verified via explorer');
@@ -174,11 +163,7 @@ describe('attestation', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'WrongFP',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'WrongFP');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -187,7 +172,7 @@ describe('attestation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'c'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const out = await runVerify(writeDoc('att-fp.json', att), rpc.url);
     expect(out).toContain('Fingerprint mismatch');
   });
@@ -199,18 +184,14 @@ describe('heartbeat', () => {
 
   it('verifies heartbeat via RPC (no explorer)', async () => {
     const key = makeKey();
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'HBAgent',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, key.privateKey));
+    const idDoc = buildIdDoc(key, 'HBAgent');
     const idTxid = rpc.addInscription(idDoc);
 
     const hb: Record<string, unknown> = {
       v: '1.0', t: 'hb', f: key.fingerprint,
       ref: { net: NET, id: idTxid }, seq: 0, ts: ts(),
     };
-    hb.s = toBase64url(sign(hb, key.privateKey));
+    hb.s = { f: key.fingerprint, sig: toBase64url(sign(hb, key.privateKey)) };
     const out = await runVerify(writeDoc('hb.json', hb), rpc.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Fingerprint match: ✓');
@@ -218,18 +199,14 @@ describe('heartbeat', () => {
 
   it('verifies heartbeat via RPC + explorer', async () => {
     const key = makeKey();
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'HBAgent2',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, key.privateKey));
+    const idDoc = buildIdDoc(key, 'HBAgent2');
     const idTxid = rpc.addInscription(idDoc);
 
     const hb: Record<string, unknown> = {
       v: '1.0', t: 'hb', f: key.fingerprint,
       ref: { net: NET, id: idTxid }, seq: 1, ts: ts(),
     };
-    hb.s = toBase64url(sign(hb, key.privateKey));
+    hb.s = { f: key.fingerprint, sig: toBase64url(sign(hb, key.privateKey)) };
     const out = await runVerify(writeDoc('hb-exp.json', hb), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state verified via explorer');
@@ -244,22 +221,18 @@ describe('supersession', () => {
     const oldKey = makeKey();
     const newKey = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'SuperAgent',
-      k: { t: 'ed25519', p: oldKey.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, oldKey.privateKey));
+    const idDoc = buildIdDoc(oldKey, 'SuperAgent');
     const idTxid = rpc.addInscription(idDoc);
 
     const superDoc: Record<string, unknown> = {
       v: '1.0', t: 'super',
       target: { f: oldKey.fingerprint, ref: { net: NET, id: idTxid } },
-      n: 'SuperAgent', k: { t: 'ed25519', p: newKey.pubB64 },
+      n: 'SuperAgent', k: [{ t: 'ed25519', p: newKey.pubB64 }],
       reason: 'key-rotation', ts: ts(),
     };
     superDoc.s = [
-      toBase64url(sign(superDoc, oldKey.privateKey)),
-      toBase64url(sign(superDoc, newKey.privateKey)),
+      { f: oldKey.fingerprint, sig: toBase64url(sign(superDoc, oldKey.privateKey)) },
+      { f: newKey.fingerprint, sig: toBase64url(sign(superDoc, newKey.privateKey)) },
     ];
     const out = await runVerify(writeDoc('super.json', superDoc), rpc.url);
     expect(out).toContain('Old key signature');
@@ -271,22 +244,18 @@ describe('supersession', () => {
     const oldKey = makeKey();
     const newKey = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'SuperAgent2',
-      k: { t: 'ed25519', p: oldKey.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, oldKey.privateKey));
+    const idDoc = buildIdDoc(oldKey, 'SuperAgent2');
     const idTxid = rpc.addInscription(idDoc);
 
     const superDoc: Record<string, unknown> = {
       v: '1.0', t: 'super',
       target: { f: oldKey.fingerprint, ref: { net: NET, id: idTxid } },
-      n: 'SuperAgent2', k: { t: 'ed25519', p: newKey.pubB64 },
+      n: 'SuperAgent2', k: [{ t: 'ed25519', p: newKey.pubB64 }],
       reason: 'key-rotation', ts: ts(),
     };
     superDoc.s = [
-      toBase64url(sign(superDoc, oldKey.privateKey)),
-      toBase64url(sign(superDoc, newKey.privateKey)),
+      { f: oldKey.fingerprint, sig: toBase64url(sign(superDoc, oldKey.privateKey)) },
+      { f: newKey.fingerprint, sig: toBase64url(sign(superDoc, newKey.privateKey)) },
     ];
     const out = await runVerify(writeDoc('super-exp.json', superDoc), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
@@ -300,11 +269,7 @@ describe('revocation', () => {
 
   it('verifies revocation via RPC (no explorer)', async () => {
     const key = makeKey();
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'RevokeMe',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, key.privateKey));
+    const idDoc = buildIdDoc(key, 'RevokeMe');
     const idTxid = rpc.addInscription(idDoc);
 
     const rev: Record<string, unknown> = {
@@ -312,18 +277,14 @@ describe('revocation', () => {
       target: { f: key.fingerprint, ref: { net: NET, id: idTxid } },
       reason: 'defunct', ts: ts(),
     };
-    rev.s = toBase64url(sign(rev, key.privateKey));
+    rev.s = { f: key.fingerprint, sig: toBase64url(sign(rev, key.privateKey)) };
     const out = await runVerify(writeDoc('revoke.json', rev), rpc.url);
     expect(out).toContain('✓ VALID');
   });
 
   it('verifies revocation via RPC + explorer', async () => {
     const key = makeKey();
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'RevokeMe2',
-      k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, key.privateKey));
+    const idDoc = buildIdDoc(key, 'RevokeMe2');
     const idTxid = rpc.addInscription(idDoc);
 
     const rev: Record<string, unknown> = {
@@ -331,14 +292,14 @@ describe('revocation', () => {
       target: { f: key.fingerprint, ref: { net: NET, id: idTxid } },
       reason: 'defunct', ts: ts(),
     };
-    rev.s = toBase64url(sign(rev, key.privateKey));
+    rev.s = { f: key.fingerprint, sig: toBase64url(sign(rev, key.privateKey)) };
     const out = await runVerify(writeDoc('revoke-exp.json', rev), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state verified via explorer');
   });
 });
 
-// ── Attestation revocation (the key test: original key vs successor key) ──
+// ── Attestation revocation ──
 
 describe('attestation revocation', () => {
 
@@ -346,11 +307,7 @@ describe('attestation revocation', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'AttRevoker',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'AttRevoker');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -359,7 +316,7 @@ describe('attestation revocation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'd'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const attTxid = rpc.addInscription(att);
 
     const attRev: Record<string, unknown> = {
@@ -367,7 +324,7 @@ describe('attestation revocation', () => {
       ref: { net: NET, id: attTxid },
       reason: 'retracted', ts: ts(),
     };
-    attRev.s = toBase64url(sign(attRev, keyA.privateKey));
+    attRev.s = { f: keyA.fingerprint, sig: toBase64url(sign(attRev, keyA.privateKey)) };
     const out = await runVerify(writeDoc('attrev.json', attRev), rpc.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('Chain state NOT checked');
@@ -378,12 +335,7 @@ describe('attestation revocation', () => {
     const keyB = makeKey();
     const keyNew = makeKey();
 
-    // Store identity and attestation on mock RPC
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'ChainRevoker',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'ChainRevoker');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -392,49 +344,45 @@ describe('attestation revocation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'e'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const attTxid = rpc.addInscription(att);
 
-    // Store supersession on mock RPC
     const superDoc: Record<string, unknown> = {
       v: '1.0', t: 'super', n: 'ChainRevoker',
-      k: { t: 'ed25519', p: keyNew.pubB64 },
+      k: [{ t: 'ed25519', p: keyNew.pubB64 }],
       target: { f: keyA.fingerprint, ref: { net: NET, id: idTxid } },
       reason: 'key-rotation', ts: ts(),
     };
     superDoc.s = [
-      toBase64url(sign(superDoc, keyA.privateKey)),
-      toBase64url(sign(superDoc, keyNew.privateKey)),
+      { f: keyA.fingerprint, sig: toBase64url(sign(superDoc, keyA.privateKey)) },
+      { f: keyNew.fingerprint, sig: toBase64url(sign(superDoc, keyNew.privateKey)) },
     ];
     const superTxid = rpc.addInscription(superDoc);
 
     // Register chain in mock explorer
     explorer.addIdentity({
       v: '1.0', t: 'id', n: 'ChainRevoker', f: keyA.fingerprint,
-      k: { t: 'ed25519', p: keyA.pubB64 },
+      k: [{ t: 'ed25519', p: keyA.pubB64 }],
     });
-    // Override the inscription_id to match our RPC txid
     const identity = (explorer as any).identities.get(keyA.fingerprint);
     identity.chain[0].inscription_id = idTxid;
     identity.chain[0].public_key = keyA.pubB64;
 
     explorer.addSupersession(keyA.fingerprint, keyNew.fingerprint, {
       v: '1.0', t: 'super', n: 'ChainRevoker',
-      k: { t: 'ed25519', p: keyNew.pubB64 },
+      k: [{ t: 'ed25519', p: keyNew.pubB64 }],
       target: { f: keyA.fingerprint },
       reason: 'key-rotation',
     });
-    // Override inscription_id to match RPC
     const lastEntry = identity.chain[identity.chain.length - 1];
     lastEntry.inscription_id = superTxid;
 
-    // Att-revoke signed by NEW key (successor)
     const attRev: Record<string, unknown> = {
       v: '1.0', t: 'att-revoke',
       ref: { net: NET, id: attTxid },
       reason: 'retracted', ts: ts(),
     };
-    attRev.s = toBase64url(sign(attRev, keyNew.privateKey));
+    attRev.s = { f: keyNew.fingerprint, sig: toBase64url(sign(attRev, keyNew.privateKey)) };
     const out = await runVerify(writeDoc('attrev-chain.json', attRev), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
     expect(out).toContain('chain key');
@@ -446,11 +394,7 @@ describe('attestation revocation', () => {
     const keyB = makeKey();
     const keyNew = makeKey();
 
-    const idDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'NoExplorerRevoker',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idDoc.s = toBase64url(sign(idDoc, keyA.privateKey));
+    const idDoc = buildIdDoc(keyA, 'NoExplorerRevoker');
     const idTxid = rpc.addInscription(idDoc);
 
     const att: Record<string, unknown> = {
@@ -459,16 +403,15 @@ describe('attestation revocation', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'f'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const attTxid = rpc.addInscription(att);
 
-    // Att-revoke signed by NEW key — should fail without explorer
     const attRev: Record<string, unknown> = {
       v: '1.0', t: 'att-revoke',
       ref: { net: NET, id: attTxid },
       reason: 'retracted', ts: ts(),
     };
-    attRev.s = toBase64url(sign(attRev, keyNew.privateKey));
+    attRev.s = { f: keyNew.fingerprint, sig: toBase64url(sign(attRev, keyNew.privateKey)) };
     const out = await runVerify(writeDoc('attrev-noexp.json', attRev), rpc.url);
     expect(out).toContain('does not match original attestor key');
     expect(out).toContain('requires --explorer-url');
@@ -483,18 +426,10 @@ describe('receipt', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    const idA: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Seller',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idA.s = toBase64url(sign(idA, keyA.privateKey));
+    const idA = buildIdDoc(keyA, 'Seller');
     const idATxid = rpc.addInscription(idA);
 
-    const idB: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Buyer',
-      k: { t: 'ed25519', p: keyB.pubB64 }, ts: ts(),
-    };
-    idB.s = toBase64url(sign(idB, keyB.privateKey));
+    const idB = buildIdDoc(keyB, 'Buyer');
     const idBTxid = rpc.addInscription(idB);
 
     const rcpt: Record<string, unknown> = {
@@ -507,8 +442,8 @@ describe('receipt', () => {
       out: 'completed', ts: ts(),
     };
     rcpt.s = [
-      toBase64url(sign(rcpt, keyA.privateKey)),
-      toBase64url(sign(rcpt, keyB.privateKey)),
+      { f: keyA.fingerprint, sig: toBase64url(sign(rcpt, keyA.privateKey)) },
+      { f: keyB.fingerprint, sig: toBase64url(sign(rcpt, keyB.privateKey)) },
     ];
     const out = await runVerify(writeDoc('rcpt.json', rcpt), rpc.url);
     expect(out).toContain('Party 0 (initiator)');
@@ -521,18 +456,10 @@ describe('receipt', () => {
     const keyA = makeKey();
     const keyB = makeKey();
 
-    const idA: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Seller2',
-      k: { t: 'ed25519', p: keyA.pubB64 }, ts: ts(),
-    };
-    idA.s = toBase64url(sign(idA, keyA.privateKey));
+    const idA = buildIdDoc(keyA, 'Seller2');
     const idATxid = rpc.addInscription(idA);
 
-    const idB: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'Buyer2',
-      k: { t: 'ed25519', p: keyB.pubB64 }, ts: ts(),
-    };
-    idB.s = toBase64url(sign(idB, keyB.privateKey));
+    const idB = buildIdDoc(keyB, 'Buyer2');
     const idBTxid = rpc.addInscription(idB);
 
     const rcpt: Record<string, unknown> = {
@@ -545,8 +472,8 @@ describe('receipt', () => {
       out: 'completed', ts: ts(),
     };
     rcpt.s = [
-      toBase64url(sign(rcpt, keyA.privateKey)),
-      toBase64url(sign(rcpt, keyB.privateKey)),
+      { f: keyA.fingerprint, sig: toBase64url(sign(rcpt, keyA.privateKey)) },
+      { f: keyB.fingerprint, sig: toBase64url(sign(rcpt, keyB.privateKey)) },
     ];
     const out = await runVerify(writeDoc('rcpt-exp.json', rcpt), rpc.url, explorer.url);
     expect(out).toContain('✓ VALID');
@@ -554,7 +481,7 @@ describe('receipt', () => {
   });
 });
 
-// ── Security: ref.id must be TXID, never file path ──
+// ── Security ──
 
 describe('security', () => {
 
@@ -568,7 +495,7 @@ describe('security', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'a'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const out = await runVerify(writeDoc('att-path.json', att), rpc.url);
     expect(out).toContain('Invalid TXID');
   });
@@ -583,7 +510,7 @@ describe('security', () => {
       to: { f: keyB.fingerprint, ref: { net: NET, id: 'a'.repeat(64) } },
       ts: ts(),
     };
-    att.s = toBase64url(sign(att, keyA.privateKey));
+    att.s = { f: keyA.fingerprint, sig: toBase64url(sign(att, keyA.privateKey)) };
     const out = await runVerify(writeDoc('att-rel.json', att), rpc.url);
     expect(out).toContain('Invalid TXID');
   });

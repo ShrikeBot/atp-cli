@@ -60,12 +60,13 @@ function createIdentity(
     v: '1.0',
     t: 'id',
     n: name,
-    k: { t: 'ed25519', p: key.pubB64 },
+    k: [{ t: 'ed25519', p: key.pubB64 }],
     ts: ts(),
   };
   if (metadata) doc.m = metadata;
   IdentityUnsignedSchema.parse(doc);
-  doc.s = toBase64url(sign(doc, key.privateKey));
+  const sig = sign(doc, key.privateKey);
+  doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -88,7 +89,8 @@ function createAttestation(
   };
   if (ctx) doc.ctx = ctx;
   AttestationUnsignedSchema.parse(doc);
-  doc.s = toBase64url(sign(doc, fromKey.privateKey));
+  const sig = sign(doc, fromKey.privateKey);
+  doc.s = { f: fromKey.fingerprint, sig: toBase64url(sig) };
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -111,7 +113,8 @@ function createHeartbeat(
   };
   if (msg) doc.msg = msg;
   HeartbeatUnsignedSchema.parse(doc);
-  doc.s = toBase64url(sign(doc, key.privateKey));
+  const sig = sign(doc, key.privateKey);
+  doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -131,15 +134,18 @@ function createSupersession(
     t: 'super',
     target: { f: oldKey.fingerprint, ref: { net: NET, id: oldTxid } },
     n: name,
-    k: { t: 'ed25519', p: newKey.pubB64 },
+    k: [{ t: 'ed25519', p: newKey.pubB64 }],
     reason,
     ts: ts(),
   };
   if (metadata) doc.m = metadata;
   SupersessionUnsignedSchema.parse(doc);
-  const oldSig = toBase64url(sign(doc, oldKey.privateKey));
-  const newSig = toBase64url(sign(doc, newKey.privateKey));
-  doc.s = [oldSig, newSig];
+  const oldSig = sign(doc, oldKey.privateKey);
+  const newSig = sign(doc, newKey.privateKey);
+  doc.s = [
+    { f: oldKey.fingerprint, sig: toBase64url(oldSig) },
+    { f: newKey.fingerprint, sig: toBase64url(newSig) },
+  ];
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -160,7 +166,8 @@ function createRevocation(
     ts: ts(),
   };
   RevocationUnsignedSchema.parse(doc);
-  doc.s = toBase64url(sign(doc, signerKey.privateKey));
+  const sig = sign(doc, signerKey.privateKey);
+  doc.s = { f: signerKey.fingerprint, sig: toBase64url(sig) };
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -180,7 +187,8 @@ function createAttRevocation(
     ts: ts(),
   };
   AttRevocationUnsignedSchema.parse(doc);
-  doc.s = toBase64url(sign(doc, signerKey.privateKey));
+  const sig = sign(doc, signerKey.privateKey);
+  doc.s = { f: signerKey.fingerprint, sig: toBase64url(sig) };
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -207,8 +215,11 @@ function createReceipt(
     ts: ts(),
   };
   ReceiptUnsignedSchema.parse(doc);
-  const sig = toBase64url(sign(doc, fromKey.privateKey));
-  doc.s = [sig, '<awaiting-counterparty-signature>'];
+  const sig = sign(doc, fromKey.privateKey);
+  doc.s = [
+    { f: fromKey.fingerprint, sig: toBase64url(sig) },
+    { f: withFp, sig: '' },
+  ];
   const txid = chain.inscribeJson(doc);
   return { doc, txid };
 }
@@ -236,7 +247,7 @@ describe('Happy Path', () => {
     expect(verifyIdentity(fetched)).toBe(true);
 
     // Show: check fields
-    const k = fetched.k as { t: string; p: string };
+    const k = (fetched.k as Array<{ t: string; p: string }>)[0];
     expect(k.t).toBe('ed25519');
     expect(computeFingerprint(fromBase64url(k.p), k.t)).toBe(key.fingerprint);
   });
@@ -277,7 +288,7 @@ describe('Happy Path', () => {
 
     expect(verifySupersession(superDoc, idA)).toBe(true);
     expect((superDoc.target as { f: string }).f).toBe(keyA.fingerprint);
-    const newK = superDoc.k as { p: string };
+    const newK = (superDoc.k as Array<{ p: string }>)[0];
     expect(fromBase64url(newK.p).equals(keyB.publicKey)).toBe(true);
   });
 
@@ -331,8 +342,8 @@ describe('Happy Path', () => {
     );
 
     // Verify initiator signature
-    const sigs = rcpt.s as string[];
-    const sigBytes = fromBase64url(sigs[0]);
+    const sigs = rcpt.s as Array<{ f: string; sig: string }>;
+    const sigBytes = fromBase64url(sigs[0].sig);
     expect(verify(rcpt, keyA.publicKey, sigBytes)).toBe(true);
     expect(rcpt.t).toBe('rcpt');
     expect((rcpt.p as Array<{ role: string }>)[0].role).toBe('initiator');

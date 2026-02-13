@@ -518,11 +518,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   async function createAndInscribeIdentity(key: KeyPair, name: string): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
       v: '1.0', t: 'id', n: name,
-      k: { t: 'ed25519', p: key.pubB64 },
+      k: [{ t: 'ed25519', p: key.pubB64 }],
       ts: ts(),
     };
     IdentityUnsignedSchema.parse(doc);
-    doc.s = toBase64url(sign(doc, key.privateKey));
+    const sig = sign(doc, key.privateKey);
+    doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
     const txid = await inscribe(doc);
     return { doc, txid };
   }
@@ -538,7 +539,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     };
     if (ctx) doc.ctx = ctx;
     AttestationUnsignedSchema.parse(doc);
-    doc.s = toBase64url(sign(doc, fromKey.privateKey));
+    const attSig = sign(doc, fromKey.privateKey);
+    doc.s = { f: fromKey.fingerprint, sig: toBase64url(attSig) };
     const txid = await inscribe(doc);
     return { doc, txid };
   }
@@ -552,7 +554,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     };
     if (msg) doc.msg = msg;
     HeartbeatUnsignedSchema.parse(doc);
-    doc.s = toBase64url(sign(doc, key.privateKey));
+    const hbSig = sign(doc, key.privateKey);
+    doc.s = { f: key.fingerprint, sig: toBase64url(hbSig) };
     const txid = await inscribe(doc);
     return { doc, txid };
   }
@@ -563,12 +566,15 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const doc: Record<string, unknown> = {
       v: '1.0', t: 'super',
       target: { f: oldKey.fingerprint, ref: { net: NET, id: oldTxid } },
-      n: name, k: { t: 'ed25519', p: newKey.pubB64 }, reason, ts: ts(),
+      n: name, k: [{ t: 'ed25519', p: newKey.pubB64 }], reason, ts: ts(),
     };
     SupersessionUnsignedSchema.parse(doc);
-    const oldSig = toBase64url(sign(doc, oldKey.privateKey));
-    const newSig = toBase64url(sign(doc, newKey.privateKey));
-    doc.s = [oldSig, newSig];
+    const oldSig = sign(doc, oldKey.privateKey);
+    const newSig = sign(doc, newKey.privateKey);
+    doc.s = [
+      { f: oldKey.fingerprint, sig: toBase64url(oldSig) },
+      { f: newKey.fingerprint, sig: toBase64url(newSig) },
+    ];
     const txid = await inscribe(doc);
     return { doc, txid };
   }
@@ -583,32 +589,43 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       reason, ts: ts(),
     };
     RevocationUnsignedSchema.parse(doc);
-    doc.s = toBase64url(sign(doc, signerKey.privateKey));
+    const revSig = sign(doc, signerKey.privateKey);
+    doc.s = { f: signerKey.fingerprint, sig: toBase64url(revSig) };
     const txid = await inscribe(doc);
     return { doc, txid };
   }
 
   // ── Verify helpers ─────────────────────────────────────────────────
 
+  function getSigBytes(s: unknown): Buffer {
+    if (typeof s === 'string') return fromBase64url(s);
+    if (s && typeof s === 'object' && 'sig' in (s as any)) {
+      const sig = (s as { sig: string | Uint8Array }).sig;
+      return typeof sig === 'string' ? fromBase64url(sig) : Buffer.from(sig);
+    }
+    throw new Error('Unknown signature format');
+  }
+
   function verifyIdentityDoc(doc: Record<string, unknown>): boolean {
-    const k = doc.k as { t: string; p: string };
+    const kArr = doc.k as Array<{ t: string; p: string }>;
+    const k = kArr[0];
     const pubBytes = fromBase64url(k.p);
-    const sigBytes = fromBase64url(doc.s as string);
+    const sigBytes = getSigBytes(doc.s);
     return verify(doc, pubBytes, sigBytes);
   }
 
   function verifyWithKey(doc: Record<string, unknown>, key: KeyPair): boolean {
-    const sigBytes = fromBase64url(doc.s as string);
+    const sigBytes = getSigBytes(doc.s);
     return verify(doc, key.publicKey, sigBytes);
   }
 
   function verifySupersessionDoc(
     doc: Record<string, unknown>, oldKey: KeyPair, newKey: KeyPair,
   ): boolean {
-    const sigs = doc.s as string[];
+    const sigs = doc.s as Array<unknown>;
     return (
-      verify(doc, oldKey.publicKey, fromBase64url(sigs[0]!)) &&
-      verify(doc, newKey.publicKey, fromBase64url(sigs[1]!))
+      verify(doc, oldKey.publicKey, getSigBytes(sigs[0])) &&
+      verify(doc, newKey.publicKey, getSigBytes(sigs[1]))
     );
   }
 
@@ -674,7 +691,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     expect(verifyIdentityDoc(fetched)).toBe(true);
 
     // Fingerprint matches
-    const k = fetched.k as { t: string; p: string };
+    const k = (fetched.k as Array<{ t: string; p: string }>)[0];
     expect(computeFingerprint(fromBase64url(k.p), k.t)).toBe(key.fingerprint);
   }, 60000);
 
@@ -908,7 +925,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const bigDoc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'HugePayload',
-        k: { t: 'ed25519', p: key.pubB64 },
+        k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: ts(),
         m: { data: Array.from({ length: 500 }, (_, i) => [`key${i}`, 'x'.repeat(200)]) },
       };
@@ -974,11 +991,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'OriginalName',
-        k: { t: 'ed25519', p: key.pubB64 },
+        k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: ts(),
       };
       IdentityUnsignedSchema.parse(doc);
-      doc.s = toBase64url(sign(doc, key.privateKey));
+      const sig = sign(doc, key.privateKey);
+      doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
       // Tamper after signing
       doc.n = 'TamperedName';
       const txid = await inscribe(doc);
@@ -1001,7 +1019,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
         ts: ts(),
       };
       AttestationUnsignedSchema.parse(doc);
-      doc.s = toBase64url(sign(doc, keyA.privateKey));
+      const sig = sign(doc, keyA.privateKey);
+      doc.s = { f: keyA.fingerprint, sig: toBase64url(sig) };
       const txid = await inscribe(doc);
       // Verify via real CLI command — should detect fingerprint mismatch
       const result = runVerify(txid);
@@ -1021,7 +1040,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
         reason: 'defunct', ts: ts(),
       };
       RevocationUnsignedSchema.parse(doc);
-      doc.s = toBase64url(sign(doc, keyB.privateKey));
+      const sig = sign(doc, keyB.privateKey);
+      doc.s = { f: keyB.fingerprint, sig: toBase64url(sig) };
       const txid = await inscribe(doc);
       // Verify via real CLI command — signed by wrong key
       const result = runVerify(txid);
@@ -1039,14 +1059,17 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'super',
         target: { f: keyA.fingerprint, ref: { net: NET, id: txA } },
-        n: 'TargetA', k: { t: 'ed25519', p: keyNew.pubB64 },
+        n: 'TargetA', k: [{ t: 'ed25519', p: keyNew.pubB64 }],
         reason: 'key-rotation', ts: ts(),
       };
       SupersessionUnsignedSchema.parse(doc);
       // Sign with C (old) and keyNew (new) — but C is NOT keyA
-      const oldSig = toBase64url(sign(doc, keyC.privateKey));
-      const newSig = toBase64url(sign(doc, keyNew.privateKey));
-      doc.s = [oldSig, newSig];
+      const oldSig = sign(doc, keyC.privateKey);
+      const newSig = sign(doc, keyNew.privateKey);
+      doc.s = [
+        { f: keyC.fingerprint, sig: toBase64url(oldSig) },
+        { f: keyNew.fingerprint, sig: toBase64url(newSig) },
+      ];
       const txid = await inscribe(doc);
       // Verify via real CLI command — old key sig doesn't match target identity
       const result = runVerify(txid);
@@ -1061,12 +1084,13 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const futureTs = Math.floor(new Date('2050-01-01').getTime() / 1000);
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'FutureAgent',
-        k: { t: 'ed25519', p: key.pubB64 },
+        k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: futureTs,
       };
       // Schema allows any positive int for ts, so this passes
       IdentityUnsignedSchema.parse(doc);
-      doc.s = toBase64url(sign(doc, key.privateKey));
+      const sig = sign(doc, key.privateKey);
+      doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
       const txid = await inscribe(doc);
       const fetched = await fetchDoc(txid);
       // validateTimestamp should throw for >2h drift
@@ -1112,7 +1136,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
         reason: 'defunct', ts: ts(),
       };
       RevocationUnsignedSchema.parse(doc);
-      doc.s = toBase64url(sign(doc, key.privateKey));
+      const sig = sign(doc, key.privateKey);
+      doc.s = { f: key.fingerprint, sig: toBase64url(sig) };
       // Can inscribe it (chain doesn't validate ATP semantics)
       const txid = await inscribe(doc);
       const fetched = await fetchDoc(txid);
@@ -1174,7 +1199,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: '',
-        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1183,7 +1208,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'A'.repeat(65),
-        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1192,7 +1217,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'Ѕhrike', // Ѕ is Cyrillic
-        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow(/ASCII/i);
     });
@@ -1237,7 +1262,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
         v: '1.0', t: 'id', n: 'Agent\x00Evil',
-        k: { t: 'ed25519', p: key.pubB64 }, ts: ts(),
+        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1247,7 +1272,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const key = makeKey();
     const originalDoc: Record<string, unknown> = {
       v: '1.0', t: 'id', n: 'EncodingTest-RoundTrip',
-      k: { t: 'ed25519', p: key.pubB64 },
+      k: [{ t: 'ed25519', p: key.pubB64 }],
       ts: ts(),
     };
     IdentityUnsignedSchema.parse(originalDoc);

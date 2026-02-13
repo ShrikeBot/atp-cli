@@ -22,7 +22,7 @@ const attest = new Command('attest')
   .option('--output <file>', 'Output file')
   .action(async (fingerprint: string, opts: Record<string, string | number | undefined>) => {
     const fromDoc = JSON.parse(await readFile(opts.from as string, 'utf8'));
-    const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
+    const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
     const fromPub = fromBase64url(fromK.p);
     const fromFp = computeFingerprint(fromPub, fromK.t);
     const net = (opts.net as string) ?? BITCOIN_MAINNET;
@@ -47,7 +47,7 @@ const attest = new Command('attest')
       : await loadPrivateKeyByFile(opts.from as string);
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, key.privateKey, format);
-    doc.s = format === 'cbor' ? sig : toBase64url(sig);
+    doc.s = { f: fromFp, sig: format === 'cbor' ? sig : toBase64url(sig) };
 
     const output = encodeDocument(doc, format);
     if (opts.output) {

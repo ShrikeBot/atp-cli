@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureObjectSchema } from './common.js';
 
 export const AttestationSchema = z.object({
   v: VersionSchema,
@@ -7,7 +7,7 @@ export const AttestationSchema = z.object({
   from: ReferenceSchema,
   to: ReferenceSchema,
   ts: TimestampSchema.optional(),
-  s: SignatureSchema,
+  s: SignatureObjectSchema,
   stake: z.number().optional(),
   ctx: z.string().optional(),
   exp: z.number().optional(),

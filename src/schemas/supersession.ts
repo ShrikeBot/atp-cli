@@ -4,7 +4,7 @@ import {
   TimestampSchema,
   ReferenceSchema,
   KeySchema,
-  SignatureSchema,
+  SignatureObjectSchema,
 } from './common.js';
 import { MetadataSchema } from './identity.js';
 
@@ -17,11 +17,13 @@ export const SupersessionSchema = z.object({
     .min(1)
     .max(64)
     .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only'),
-  k: KeySchema,
+  k: z.array(KeySchema).min(1),
   m: MetadataSchema,
   reason: z.enum(['key-rotation', 'algorithm-upgrade', 'key-compromised', 'metadata-update']),
   ts: TimestampSchema.optional(),
-  s: z.union([SignatureSchema, z.array(SignatureSchema)]),
+  s: z.array(SignatureObjectSchema).length(2),
+  vnb: z.number().int().positive().optional(),
+  vna: z.number().int().positive().optional(),
 });
 
 export const SupersessionUnsignedSchema = SupersessionSchema.omit({ s: true });

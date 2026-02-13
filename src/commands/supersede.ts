@@ -58,11 +58,13 @@ const supersede = new Command('supersede')
   .option('--link <platform:handle>', 'Add link', collectPair('links'), [])
   .option('--key-ref <type:fingerprint>', 'Add key reference', collectPair('keys'), [])
   .option('--wallet <type:address>', 'Add wallet', collectPair('wallets'), [])
+  .option('--vnb <n>', 'Version number before', parseInt)
+  .option('--vna <n>', 'Version number after', parseInt)
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file')
   .action(async (opts: Record<string, string | undefined>) => {
     const oldDoc = JSON.parse(await readFile(opts.old!, 'utf8'));
-    const oldK = Array.isArray(oldDoc.k) ? oldDoc.k[0] : oldDoc.k;
+    const oldK = (Array.isArray(oldDoc.k) ? oldDoc.k : [oldDoc.k])[0];
     const oldPub = fromBase64url(oldK.p);
     const oldFp = computeFingerprint(oldPub, oldK.t);
     const net = opts.net ?? BITCOIN_MAINNET;
@@ -113,14 +115,13 @@ const supersede = new Command('supersede')
       t: 'super',
       target: { f: oldFp, ref: { net, id: opts.oldTxid as string } },
       n: name,
-      k: {
-        t: newKeyType,
-        p: toBase64url(newPublicKey),
-      },
+      k: [{ t: newKeyType, p: toBase64url(newPublicKey) }],
       reason: opts.reason,
       ts: Math.floor(Date.now() / 1000),
     };
     if (m) doc.m = m;
+    if (opts.vnb) doc.vnb = opts.vnb;
+    if (opts.vna) doc.vna = opts.vna;
     validateTimestamp(doc.ts as number, 'Supersession');
 
     // Validate before signing
@@ -134,8 +135,12 @@ const supersede = new Command('supersede')
     const format = opts.encoding ?? 'json';
     const oldSig = sign(doc, oldKey.privateKey, format);
     const newSig = sign(doc, newPrivateKey, format);
+    const newFp = computeFingerprint(newPublicKey, newKeyType);
 
-    doc.s = format === 'cbor' ? [oldSig, newSig] : [toBase64url(oldSig), toBase64url(newSig)];
+    doc.s = [
+      { f: oldFp, sig: format === 'cbor' ? oldSig : toBase64url(oldSig) },
+      { f: newFp, sig: format === 'cbor' ? newSig : toBase64url(newSig) },
+    ];
 
     const output = encodeDocument(doc, format);
     if (opts.output) {

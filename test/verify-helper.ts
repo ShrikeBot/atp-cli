@@ -19,14 +19,25 @@ export function fetchDocument(chain: MockChain, txid: string): Record<string, un
 
 /** Get public key bytes from an identity document */
 function getPubKeyFromIdentity(doc: Record<string, unknown>): { pubBytes: Buffer; keyType: string } {
-  const k = doc.k as { t: string; p: string };
+  const kRaw = doc.k;
+  const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { t: string; p: string };
   return { pubBytes: fromBase64url(k.p), keyType: k.t };
+}
+
+/** Extract signature bytes from a signature field (string or {f, sig}) */
+function getSigBytes(s: unknown): Buffer {
+  if (typeof s === 'string') return fromBase64url(s);
+  if (s && typeof s === 'object' && 'sig' in (s as any)) {
+    const sig = (s as { sig: string | Uint8Array }).sig;
+    return typeof sig === 'string' ? fromBase64url(sig) : Buffer.from(sig);
+  }
+  throw new Error('Unknown signature format');
 }
 
 /** Verify signature on an identity document */
 export function verifyIdentity(doc: Record<string, unknown>): boolean {
   const { pubBytes } = getPubKeyFromIdentity(doc);
-  const sigBytes = fromBase64url(doc.s as string);
+  const sigBytes = getSigBytes(doc.s);
   return verify(doc, pubBytes, sigBytes);
 }
 
@@ -36,7 +47,7 @@ export function verifyWithIdentity(
   identityDoc: Record<string, unknown>,
 ): boolean {
   const { pubBytes } = getPubKeyFromIdentity(identityDoc);
-  const sigBytes = fromBase64url(doc.s as string);
+  const sigBytes = getSigBytes(doc.s);
   return verify(doc, pubBytes, sigBytes);
 }
 
@@ -46,11 +57,12 @@ export function verifySupersession(
   oldIdentityDoc: Record<string, unknown>,
 ): boolean {
   const { pubBytes: oldPub } = getPubKeyFromIdentity(oldIdentityDoc);
-  const newK = doc.k as { t: string; p: string };
+  const kRaw = doc.k;
+  const newK = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { t: string; p: string };
   const newPub = fromBase64url(newK.p);
-  const sigs = doc.s as string[];
-  const oldSigBytes = fromBase64url(sigs[0]);
-  const newSigBytes = fromBase64url(sigs[1]);
+  const sigs = doc.s as Array<unknown>;
+  const oldSigBytes = getSigBytes(sigs[0]);
+  const newSigBytes = getSigBytes(sigs[1]);
   return verify(doc, oldPub, oldSigBytes) && verify(doc, newPub, newSigBytes);
 }
 
@@ -60,7 +72,7 @@ export function verifyRevocation(
   signerIdentityDoc: Record<string, unknown>,
 ): boolean {
   const { pubBytes } = getPubKeyFromIdentity(signerIdentityDoc);
-  const sigBytes = fromBase64url(doc.s as string);
+  const sigBytes = getSigBytes(doc.s);
   return verify(doc, pubBytes, sigBytes);
 }
 
@@ -100,7 +112,8 @@ export function isKeyInChain(
 
   // Check each supersession's new key
   for (const doc of supersessionDocs) {
-    const k = doc.k as { t: string; p: string };
+    const kRaw = doc.k;
+    const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { t: string; p: string };
     const fp = computeFingerprint(fromBase64url(k.p), k.t);
     if (fp === fingerprint) return true;
   }

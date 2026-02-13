@@ -4,7 +4,7 @@ import {
   TimestampSchema,
   PartySchema,
   ExchangeSchema,
-  SignatureSchema,
+  SignatureObjectSchema,
 } from './common.js';
 
 export const ReceiptSchema = z.object({
@@ -14,7 +14,7 @@ export const ReceiptSchema = z.object({
   ex: ExchangeSchema,
   out: z.enum(['completed', 'partial', 'cancelled', 'disputed']),
   ts: TimestampSchema.optional(),
-  s: z.union([SignatureSchema, z.array(SignatureSchema)]),
+  s: z.array(SignatureObjectSchema),
 });
 
 export const ReceiptUnsignedSchema = ReceiptSchema.omit({ s: true });

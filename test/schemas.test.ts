@@ -25,9 +25,9 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'Shrike',
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => IdentitySchema.parse(doc)).not.toThrow();
   });
@@ -37,9 +37,9 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'Ѕhrike', // Cyrillic Ѕ
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
   });
@@ -49,9 +49,9 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'a'.repeat(65),
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
   });
@@ -60,9 +60,9 @@ describe('Identity Schema', () => {
     const doc = {
       v: '1.0' as const,
       t: 'id' as const,
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => IdentitySchema.parse(doc)).toThrow();
   });
@@ -72,7 +72,7 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'Shrike',
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
     };
     expect(() => IdentityUnsignedSchema.parse(doc)).not.toThrow();
@@ -83,9 +83,9 @@ describe('Identity Schema', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'Shrike',
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
       m: {
         links: [['twitter', '@shrikey_'], ['github', 'ShrikeBot']],
         wallets: [['bitcoin', 'bc1qtest']],
@@ -139,7 +139,7 @@ describe('Supersession Schema', () => {
       t: 'super' as const,
       target: { f: FAKE_FP, ref: FAKE_REF },
       n: 'Shrike',
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       reason: 'key-rotation' as const,
       ts: NOW,
     };
@@ -221,9 +221,9 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       v: '1.0' as const,
       t: 'id' as const,
       n: 'Test',
-      k: { t: 'ed25519', p: FAKE_PUB },
+      k: [{ t: 'ed25519', p: FAKE_PUB }],
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => AtpDocumentSchema.parse(doc)).not.toThrow();
   });
@@ -236,7 +236,7 @@ describe('AtpDocumentSchema (discriminated union)', () => {
       ref: FAKE_REF,
       seq: 42,
       ts: NOW,
-      s: FAKE_SIG,
+      s: { f: FAKE_FP, sig: FAKE_SIG },
     };
     expect(() => AtpDocumentSchema.parse(doc)).not.toThrow();
   });

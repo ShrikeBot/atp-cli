@@ -27,7 +27,7 @@ receipt
   .option('--output <file>', 'Output file')
   .action(async (opts: Record<string, string | number | undefined>) => {
     const fromDoc = JSON.parse(await readFile(opts.from as string, 'utf8'));
-    const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
+    const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
     const fromPub = fromBase64url(fromK.p);
     const fromFp = computeFingerprint(fromPub, fromK.t);
     const net = (opts.net as string) ?? BITCOIN_MAINNET;
@@ -58,10 +58,10 @@ receipt
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, key.privateKey, format);
 
-    doc.s =
-      format === 'cbor'
-        ? [sig, Buffer.alloc(0)]
-        : [toBase64url(sig), '<awaiting-counterparty-signature>'];
+    doc.s = [
+      { f: fromFp, sig: format === 'cbor' ? sig : toBase64url(sig) },
+      { f: (opts.with as string), sig: '' },
+    ];
 
     const output = encodeDocument(doc, format);
     if (opts.output) {
@@ -95,11 +95,11 @@ receipt
     }
 
     const parties = doc.p as Array<{ f: string; ref: { net: string; id: string }; role: string }>;
-    const sigs = doc.s as string[];
+    const sigs = doc.s as Array<{ f: string; sig: string }>;
 
     // Load our identity to find which party we are
     const myDoc = JSON.parse(await readFile(opts.identity!, 'utf8'));
-    const myK = Array.isArray(myDoc.k) ? myDoc.k[0] : myDoc.k;
+    const myK = (Array.isArray(myDoc.k) ? myDoc.k : [myDoc.k])[0];
     const myPub = fromBase64url(myK.p);
     const myFp = computeFingerprint(myPub, myK.t);
 
@@ -119,7 +119,7 @@ receipt
     const { s: _sigs, ...unsigned } = doc;
     for (let i = 0; i < parties.length; i++) {
       if (i === myIndex) continue;
-      if (!sigs[i] || sigs[i].startsWith('<')) {
+      if (!sigs[i] || !sigs[i].sig) {
         console.error(`Error: party ${i} (${parties[i].role}) has not signed yet`);
         process.exit(1);
       }
@@ -141,7 +141,7 @@ receipt
       }
 
       // Verify signature
-      const otherSigBytes = fromBase64url(sigs[i]);
+      const otherSigBytes = fromBase64url(sigs[i].sig as string);
       const valid = verifySig(unsigned as Record<string, unknown>, resolved.pubBytes, otherSigBytes, format, resolved.keyType);
       if (!valid) {
         console.error(`Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`);
@@ -155,7 +155,7 @@ receipt
       ? await loadPrivateKeyFromFile(opts.privateKey, myK.t)
       : await loadPrivateKeyByFile(opts.identity!);
     const sig = sign(unsigned as Record<string, unknown>, key.privateKey, format);
-    sigs[myIndex] = format === 'cbor' ? sig as unknown as string : toBase64url(sig);
+    sigs[myIndex] = { f: myFp, sig: format === 'cbor' ? sig as unknown as string : toBase64url(sig) };
     doc.s = sigs;
 
     const output = encodeDocument(doc, format);

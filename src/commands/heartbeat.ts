@@ -19,7 +19,7 @@ const heartbeat = new Command('heartbeat')
   .option('--output <file>', 'Output file')
   .action(async (opts: Record<string, string | undefined>) => {
     const fromDoc = JSON.parse(await readFile(opts.from!, 'utf8'));
-    const fromK = Array.isArray(fromDoc.k) ? fromDoc.k[0] : fromDoc.k;
+    const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
     const fromPub = fromBase64url(fromK.p);
     const fp = computeFingerprint(fromPub, fromK.t);
     const net = opts.net ?? BITCOIN_MAINNET;
@@ -44,7 +44,7 @@ const heartbeat = new Command('heartbeat')
       : await loadPrivateKeyByFile(opts.from!);
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
-    doc.s = format === 'cbor' ? sig : toBase64url(sig);
+    doc.s = { f: fp, sig: format === 'cbor' ? sig : toBase64url(sig) };
 
     const output = encodeDocument(doc, format);
     if (opts.output) {

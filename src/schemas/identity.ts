@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, KeySchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, KeySchema, SignatureObjectSchema } from './common.js';
 
 /** Structured metadata: named collections of key-value tuples */
 export const MetadataSchema = z.record(z.string(), z.array(z.tuple([z.string(), z.string()]))).optional();
@@ -12,11 +12,12 @@ export const IdentitySchema = z.object({
     .min(1)
     .max(64)
     .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only (no Unicode homoglyphs)'),
-  k: KeySchema,
+  k: z.array(KeySchema).min(1),
   ts: TimestampSchema.optional(),
-  s: SignatureSchema,
+  s: SignatureObjectSchema,
   m: MetadataSchema,
   sup: z.string().optional(),
+  vna: z.number().int().positive().optional(),
 });
 
 /** Identity document without signature (for pre-sign validation) */

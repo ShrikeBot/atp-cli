@@ -59,9 +59,10 @@ identity
   .option('--link <platform:handle>', 'Add link (shorthand for --meta links:platform:handle)', collectPair('links'), [])
   .option('--key-ref <type:fingerprint>', 'Add key reference (shorthand for --meta keys:type:fp)', collectPair('keys'), [])
   .option('--wallet <type:address>', 'Add wallet (shorthand for --meta wallets:type:address)', collectPair('wallets'), [])
+  .option('--vna <n>', 'Version number (ascending)', parseInt)
   .option('--encoding <format>', 'json or cbor', 'json')
   .option('--output <file>', 'Output file (default: stdout)')
-  .action(async (opts: Record<string, string | boolean | undefined>) => {
+  .action(async (opts: Record<string, string | boolean | number | undefined>) => {
     const keyType = (opts.key as string) ?? 'ed25519';
     let privateKey: Buffer;
     let publicKey: Buffer;
@@ -114,10 +115,7 @@ identity
       v: '1.0',
       t: 'id',
       n: name,
-      k: {
-        t: keyType,
-        p: toBase64url(publicKey),
-      },
+      k: [{ t: keyType, p: toBase64url(publicKey) }],
       ts: Math.floor(Date.now() / 1000),
     };
     validateTimestamp(doc.ts as number, 'Identity');
@@ -135,9 +133,11 @@ identity
     // Validate before signing
     IdentityUnsignedSchema.parse(doc);
 
+    if (opts.vna) doc.vna = opts.vna;
+
     const format = (opts.encoding as string) ?? 'json';
     const sig = sign(doc, privateKey, format);
-    doc.s = format === 'cbor' ? sig : toBase64url(sig);
+    doc.s = { f: fingerprint, sig: format === 'cbor' ? sig : toBase64url(sig) };
 
     const output = encodeDocument(doc, format);
 
@@ -167,12 +167,16 @@ identity
     console.log(`Version:     ${doc.v}`);
     console.log(`Type:        ${doc.t}`);
 
-    const k = doc.k;
-    const pubBytes = fromBase64url(k.p);
-    const fp = computeFingerprint(pubBytes, k.t);
-    console.log(`Key Type:    ${k.t}`);
-    console.log(`Fingerprint: ${fp}`);
-    console.log(`Public Key:  ${k.p}`);
+    const keys = Array.isArray(doc.k) ? doc.k : [doc.k];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const pubBytes = fromBase64url(k.p);
+      const fp = computeFingerprint(pubBytes, k.t);
+      const prefix = keys.length > 1 ? `Key ${i}: ` : '';
+      console.log(`${prefix}Key Type:    ${k.t}`);
+      console.log(`${prefix}Fingerprint: ${fp}`);
+      console.log(`${prefix}Public Key:  ${k.p}`);
+    }
 
     if (doc.m) {
       console.log(`Metadata:`);
@@ -184,9 +188,13 @@ identity
       }
     }
     console.log(`Created:     ${new Date(doc.ts * 1000).toISOString()}`);
-    console.log(
-      `Signature:   ${typeof doc.s === 'string' ? doc.s.slice(0, 32) + '...' : '(binary)'}`,
-    );
+    const sig = doc.s;
+    if (sig && typeof sig === 'object' && 'f' in sig && 'sig' in sig) {
+      console.log(`Signer:      ${sig.f}`);
+      console.log(`Signature:   ${typeof sig.sig === 'string' ? sig.sig.slice(0, 32) + '...' : '(binary)'}`);
+    } else {
+      console.log(`Signature:   ${typeof sig === 'string' ? sig.slice(0, 32) + '...' : '(binary)'}`);
+    }
   });
 
 identity

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureObjectSchema } from './common.js';
 
 export const RevocationSchema = z.object({
   v: VersionSchema,
@@ -7,7 +7,8 @@ export const RevocationSchema = z.object({
   target: ReferenceSchema,
   reason: z.enum(['key-compromised', 'defunct']),
   ts: TimestampSchema.optional(),
-  s: SignatureSchema,
+  s: SignatureObjectSchema,
+  vnb: z.number().int().positive().optional(),
 });
 
 export const RevocationUnsignedSchema = RevocationSchema.omit({ s: true });

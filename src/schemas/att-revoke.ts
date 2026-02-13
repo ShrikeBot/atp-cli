@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, LocationRefSchema, SignatureSchema } from './common.js';
+import { VersionSchema, TimestampSchema, LocationRefSchema, SignatureObjectSchema } from './common.js';
 
 export const AttRevocationSchema = z.object({
   v: VersionSchema,
@@ -7,7 +7,7 @@ export const AttRevocationSchema = z.object({
   ref: LocationRefSchema,
   reason: z.enum(['retracted', 'fraudulent', 'expired', 'error']),
   ts: TimestampSchema.optional(),
-  s: SignatureSchema,
+  s: SignatureObjectSchema,
 });
 
 export const AttRevocationUnsignedSchema = AttRevocationSchema.omit({ s: true });

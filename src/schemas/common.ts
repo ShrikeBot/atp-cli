@@ -13,13 +13,19 @@ export const Base64urlSchema = z.string().regex(/^[A-Za-z0-9_-]+$/, 'Invalid bas
 export const SignatureSchema = z.union([Base64urlSchema, z.instanceof(Uint8Array)]);
 
 /** Supported key types */
-export const KeyTypeSchema = z.enum(['ed25519', 'secp256k1']);
+export const KeyTypeSchema = z.enum(['ed25519', 'secp256k1', 'dilithium', 'falcon']);
 
 /** Key object */
 export const KeySchema = z.object({
   t: KeyTypeSchema,
   p: Base64urlSchema,
   role: z.string().optional(),
+});
+
+/** Signature object: fingerprint + signature */
+export const SignatureObjectSchema = z.object({
+  f: Base64urlSchema,
+  sig: SignatureSchema,
 });
 
 /** Location reference (platform-agnostic document locator) */
@@ -60,3 +66,4 @@ export type LocationRef = z.infer<typeof LocationRefSchema>;
 export type Reference = z.infer<typeof ReferenceSchema>;
 export type Party = z.infer<typeof PartySchema>;
 export type Exchange = z.infer<typeof ExchangeSchema>;
+export type SignatureObject = z.infer<typeof SignatureObjectSchema>;

@@ -71,7 +71,8 @@ async function resolveIdentity(
   if (doc.t !== 'id' && doc.t !== 'super') {
     throw new Error(`Referenced document is type '${doc.t}', expected 'id' or 'super'`);
   }
-  const k = doc.k as { t: string; p: string };
+  const keys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
+  const k = Array.isArray(keys) ? keys[0] : keys;
   const pubBytes = fromBase64url(k.p);
   const keyType = k.t;
   const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -111,7 +112,8 @@ async function resolveCurrentKey(
     throw new Error(`Explorer pointed to document type '${doc.t}', expected 'id' or 'super'`);
   }
 
-  const k = doc.k as { t: string; p: string };
+  const keys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
+  const k = Array.isArray(keys) ? keys[0] : keys;
   const pubBytes = fromBase64url(k.p);
   const keyType = k.t;
   const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -149,7 +151,8 @@ async function resolveChainKeys(
       { net: 'bip122:000000000019d6689c085ae165831e93', id: entry.inscription_id },
       opts,
     );
-    const k = doc.k as { t: string; p: string };
+    const docKeys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
+    const k = Array.isArray(docKeys) ? docKeys[0] : docKeys;
     const pubBytes = fromBase64url(k.p);
     const keyType = k.t;
     const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -266,30 +269,47 @@ const verifyCmd = new Command('verify')
     try {
       switch (doc.t) {
         case 'id': {
-          const k = doc.k as { t: string; p: string };
-          const pubBytes = fromBase64url(k.p);
-          const sigBytes = typeof doc.s === 'string' ? fromBase64url(doc.s as string) : (doc.s as Uint8Array);
-          const fp = computeFingerprint(pubBytes, k.t);
-          const valid = verify(doc, pubBytes, sigBytes, format);
-          sigValid('Signature', valid, fp);
+          const keys = doc.k as Array<{ t: string; p: string }>;
+          const s = doc.s as { f: string; sig: string | Uint8Array };
+          const sigBytes = typeof s.sig === 'string' ? fromBase64url(s.sig) : s.sig;
+          // Find the key matching s.f
+          let matched = false;
+          for (const k of keys) {
+            const pubBytes = fromBase64url(k.p);
+            const fp = computeFingerprint(pubBytes, k.t);
+            if (fp === s.f) {
+              const valid = verify(doc, pubBytes, sigBytes, format);
+              sigValid('Signature', valid, fp);
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            // Fallback: try first key
+            const k = keys[0];
+            const pubBytes = fromBase64url(k.p);
+            const fp = computeFingerprint(pubBytes, k.t);
+            const valid = verify(doc, pubBytes, sigBytes, format);
+            sigValid('Signature', valid, fp);
+          }
           break;
         }
 
         case 'att': {
           const from = doc.from as { f: string; ref: { net: string; id: string } };
           const to = doc.to as { f: string };
+          const s = doc.s as { f: string; sig: string | Uint8Array };
           console.log(`  Attestation: ${from.f} → ${to.f}`);
           try {
             const resolved = await resolveIdentity(from.ref, verifyOpts);
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
-            // Verify fingerprint match
             if (from.f !== resolved.fingerprint) {
               console.error(`  ✗ Fingerprint mismatch: doc says ${from.f}, resolved ${resolved.fingerprint}`);
               process.exit(1);
             } else {
               console.log(`  Fingerprint match: ✓`);
             }
-            const sigBytes = fromBase64url(doc.s as string);
+            const sigBytes = typeof s.sig === 'string' ? fromBase64url(s.sig) : s.sig;
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
@@ -302,6 +322,7 @@ const verifyCmd = new Command('verify')
         case 'hb': {
           const ref = doc.ref as { net: string; id: string };
           const f = doc.f as string;
+          const s = doc.s as { f: string; sig: string | Uint8Array };
           console.log(`  Heartbeat from ${f}, seq=${doc.seq}`);
           if (doc.msg) console.log(`  Message: ${doc.msg}`);
           try {
@@ -313,7 +334,7 @@ const verifyCmd = new Command('verify')
             } else {
               console.log(`  Fingerprint match: ✓`);
             }
-            const sigBytes = fromBase64url(doc.s as string);
+            const sigBytes = typeof s.sig === 'string' ? fromBase64url(s.sig) : s.sig;
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
@@ -325,7 +346,8 @@ const verifyCmd = new Command('verify')
 
         case 'super': {
           const target = doc.target as { f: string; ref: { net: string; id: string } };
-          const k = doc.k as { t: string; p: string };
+          const keys = doc.k as Array<{ t: string; p: string }>;
+          const k = keys[0];
           const newPubBytes = fromBase64url(k.p);
           const newFp = computeFingerprint(newPubBytes, k.t);
           console.log(`  Supersession: ${target.f} → ${newFp} (${doc.n})`);
@@ -339,9 +361,9 @@ const verifyCmd = new Command('verify')
             } else {
               console.log(`  Target fingerprint match: ✓`);
             }
-            const sigs = doc.s as string[];
-            const oldSigBytes = fromBase64url(sigs[0]);
-            const newSigBytes = fromBase64url(sigs[1]);
+            const sigs = doc.s as Array<{ f: string; sig: string | Uint8Array }>;
+            const oldSigBytes = typeof sigs[0].sig === 'string' ? fromBase64url(sigs[0].sig) : sigs[0].sig;
+            const newSigBytes = typeof sigs[1].sig === 'string' ? fromBase64url(sigs[1].sig) : sigs[1].sig;
             const oldValid = verify(doc, oldKey.pubBytes, oldSigBytes, format, oldKey.keyType);
             sigValid('Old key signature', oldValid, oldKey.fingerprint);
             const newValid = verify(doc, newPubBytes, newSigBytes, format, k.t);
@@ -355,12 +377,13 @@ const verifyCmd = new Command('verify')
 
         case 'revoke': {
           const target = doc.target as { f: string; ref: { net: string; id: string } };
+          const s = doc.s as { f: string; sig: string | Uint8Array };
           console.log(`  Revocation of ${target.f}`);
           console.log(`  Reason: ${doc.reason}`);
           try {
             const resolved = await resolveIdentity(target.ref, verifyOpts);
             console.log(`  Resolved target identity: ${resolved.fingerprint}`);
-            const sigBytes = fromBase64url(doc.s as string);
+            const sigBytes = typeof s.sig === 'string' ? fromBase64url(s.sig) : s.sig;
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
@@ -372,6 +395,7 @@ const verifyCmd = new Command('verify')
 
         case 'att-revoke': {
           const ref = doc.ref as { net: string; id: string };
+          const s = doc.s as { f: string; sig: string | Uint8Array };
           console.log(`  Attestation revocation`);
           console.log(`  Reason: ${doc.reason}`);
           try {
@@ -384,7 +408,7 @@ const verifyCmd = new Command('verify')
             const from = attDoc.from as { f: string; ref: { net: string; id: string } };
             console.log(`  Original attestor: ${from.f}`);
 
-            const sigBytes = fromBase64url(doc.s as string);
+            const sigBytes = typeof s.sig === 'string' ? fromBase64url(s.sig) : s.sig;
 
             if (hasExplorer) {
               // Walk the full supersession chain — try each key
@@ -424,12 +448,12 @@ const verifyCmd = new Command('verify')
 
         case 'rcpt': {
           const parties = doc.p as Array<{ f: string; ref: { net: string; id: string }; role: string }>;
-          const sigs = doc.s as string[];
+          const sigs = doc.s as Array<{ f: string; sig: string | Uint8Array }>;
           console.log(`  Receipt with ${parties.length} parties`);
           for (let i = 0; i < parties.length; i++) {
             const party = parties[i];
             console.log(`  Party ${i} (${party.role}): ${party.f}`);
-            if (sigs[i] && !sigs[i].startsWith('<')) {
+            if (sigs[i] && sigs[i].sig && (typeof sigs[i].sig !== 'string' || (sigs[i].sig as string).length > 0)) {
               try {
                 const resolved = await resolveIdentity(party.ref, verifyOpts);
                 if (party.f !== resolved.fingerprint) {
@@ -438,7 +462,7 @@ const verifyCmd = new Command('verify')
                 } else {
                   console.log(`    Fingerprint match: ✓`);
                 }
-                const sigBytes = fromBase64url(sigs[i]);
+                const sigBytes = typeof sigs[i].sig === 'string' ? fromBase64url(sigs[i].sig as string) : (sigs[i].sig as Uint8Array);
                 const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                 sigValid(`  Party ${i} signature`, valid, resolved.fingerprint);
               } catch (e) {

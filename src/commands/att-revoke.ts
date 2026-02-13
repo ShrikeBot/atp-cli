@@ -1,8 +1,9 @@
 import { validateTimestamp } from '../lib/timestamp.js';
 import { Command } from 'commander';
 import { readFile, writeFile } from 'node:fs/promises';
-import { toBase64url, encodeDocument } from '../lib/encoding.js';
+import { fromBase64url, toBase64url, encodeDocument } from '../lib/encoding.js';
 import { sign } from '../lib/signing.js';
+import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { AttRevocationUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
 
@@ -22,7 +23,10 @@ const attRevoke = new Command('att-revoke')
     }
 
     // Read identity to load key (needed for signing)
-    await readFile(opts.from!, 'utf8');
+    const fromDoc = JSON.parse(await readFile(opts.from!, 'utf8'));
+    const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
+    const fromPub = fromBase64url(fromK.p);
+    const fromFp = computeFingerprint(fromPub, fromK.t);
     const net = opts.net ?? BITCOIN_MAINNET;
 
     const doc: Record<string, unknown> = {
@@ -38,11 +42,11 @@ const attRevoke = new Command('att-revoke')
     AttRevocationUnsignedSchema.parse(doc);
 
     const key = opts.privateKey
-      ? await loadPrivateKeyFromFile(opts.privateKey)
+      ? await loadPrivateKeyFromFile(opts.privateKey, fromK.t)
       : await loadPrivateKeyByFile(opts.from!);
     const format = opts.encoding ?? 'json';
     const sig = sign(doc, key.privateKey, format);
-    doc.s = format === 'cbor' ? sig : toBase64url(sig);
+    doc.s = { f: fromFp, sig: format === 'cbor' ? sig : toBase64url(sig) };
 
     const output = encodeDocument(doc, format);
     if (opts.output) {
