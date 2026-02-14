@@ -43,7 +43,9 @@ async function fetchDoc(
         vin: Array<{ txinwitness?: string[] }>;
     };
     const witness = tx.vin[0]?.txinwitness;
-    if (!witness || witness.length === 0) throw new Error("No witness data in referenced tx");
+    if (!witness || witness.length === 0) {
+        throw new Error("No witness data in referenced tx");
+    }
     let extracted: { contentType: string; data: Buffer } | null = null;
     for (let i = witness.length - 1; i >= 0; i--) {
         try {
@@ -53,7 +55,9 @@ async function fetchDoc(
             /* try next */
         }
     }
-    if (!extracted) throw new Error("No inscription found in any witness element");
+    if (!extracted) {
+        throw new Error("No inscription found in any witness element");
+    }
     const { contentType, data } = extracted;
     if (contentType.includes("cbor")) {
         return cborDecode(data) as Record<string, unknown>;
@@ -251,7 +255,7 @@ const verifyCmd = new Command("verify")
             process.exit(1);
         }
 
-        if (doc.ts != null) {
+        if (doc.ts !== null && doc.ts !== undefined) {
             try {
                 validateTimestamp(doc.ts as number, "Document");
                 console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
@@ -272,7 +276,7 @@ const verifyCmd = new Command("verify")
             rpcPass: opts.rpcPass,
             explorerUrl: opts.explorerUrl,
         };
-        const hasExplorer = !!opts.explorerUrl;
+        const hasExplorer = Boolean(opts.explorerUrl);
 
         try {
             switch (doc.t) {
@@ -342,7 +346,9 @@ const verifyCmd = new Command("verify")
                     const f = doc.f as string;
                     const s = doc.s as { f: string; sig: string | Uint8Array };
                     console.log(`  Heartbeat from ${f}, seq=${doc.seq}`);
-                    if (doc.msg) console.log(`  Message: ${doc.msg}`);
+                    if (doc.msg) {
+                        console.log(`  Message: ${doc.msg}`);
+                    }
                     try {
                         const resolved = await resolveIdentity(ref, verifyOpts);
                         console.log(`  Resolved identity: ${resolved.fingerprint}`);

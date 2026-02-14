@@ -30,8 +30,11 @@ export class BitcoinRPC {
                     res.on("end", () => {
                         try {
                             const json = JSON.parse(data);
-                            if (json.error) reject(new Error(json.error.message));
-                            else resolve(json.result);
+                            if (json.error) {
+                                reject(new Error(json.error.message));
+                            } else {
+                                resolve(json.result);
+                            }
                         } catch (e) {
                             reject(e);
                         }

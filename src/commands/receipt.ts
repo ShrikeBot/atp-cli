@@ -126,7 +126,9 @@ receipt
         // Verify ALL other parties' signatures before countersigning
         const { s: _sigs, ...unsigned } = doc;
         for (let i = 0; i < parties.length; i++) {
-            if (i === myIndex) continue;
+            if (i === myIndex) {
+                continue;
+            }
             if (!sigs[i] || !sigs[i].sig) {
                 console.error(`Error: party ${i} (${parties[i].role}) has not signed yet`);
                 process.exit(1);

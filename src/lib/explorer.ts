@@ -86,7 +86,9 @@ export class ExplorerClient {
             let errorMsg = `Explorer API error: ${res.status}`;
             try {
                 const parsed = JSON.parse(body);
-                if (parsed.error?.message) errorMsg = `Explorer: ${parsed.error.message}`;
+                if (parsed.error?.message) {
+                    errorMsg = `Explorer: ${parsed.error.message}`;
+                }
             } catch {
                 /* use default */
             }

@@ -47,11 +47,15 @@ export function extractInscriptionFromWitness(witnessHex: string): {
 } {
     const buf = Buffer.from(witnessHex, "hex");
     const ordIdx = buf.indexOf(Buffer.from("ord", "ascii"));
-    if (ordIdx === -1) throw new Error("No inscription found in witness");
+    if (ordIdx === -1) {
+        throw new Error("No inscription found in witness");
+    }
 
     let pos = ordIdx + 3;
 
-    if (buf[pos] !== 0x01) throw new Error("Expected content-type tag");
+    if (buf[pos] !== 0x01) {
+        throw new Error("Expected content-type tag");
+    }
     pos++;
 
     // Detect format: real ordinals uses PUSH1 0x01 (tag value) then pushdata for ct,
@@ -73,7 +77,9 @@ export function extractInscriptionFromWitness(witnessHex: string): {
         pos += ctLen;
     }
 
-    if (buf[pos] !== 0x00) throw new Error("Expected body separator");
+    if (buf[pos] !== 0x00) {
+        throw new Error("Expected body separator");
+    }
     pos++;
 
     const dataChunks: Buffer[] = [];
@@ -92,7 +98,9 @@ export function extractInscriptionFromWitness(witnessHex: string): {
 
 function readPush(buf: Buffer, pos: number): { value: Buffer; newPos: number } {
     const op = buf[pos]!;
-    if (op === 0x00) return { value: Buffer.alloc(0), newPos: pos + 1 };
+    if (op === 0x00) {
+        return { value: Buffer.alloc(0), newPos: pos + 1 };
+    }
     if (op <= 75) {
         return { value: buf.subarray(pos + 1, pos + 1 + op), newPos: pos + 1 + op };
     }

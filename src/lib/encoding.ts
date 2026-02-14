@@ -16,8 +16,12 @@ export function jsonCanonical(obj: unknown): Buffer {
 }
 
 function sortKeys(val: unknown): unknown {
-    if (val === null || typeof val !== "object") return val;
-    if (Array.isArray(val)) return val.map(sortKeys);
+    if (val === null || typeof val !== "object") {
+        return val;
+    }
+    if (Array.isArray(val)) {
+        return val.map(sortKeys);
+    }
     const sorted: Record<string, unknown> = {};
     for (const k of Object.keys(val as Record<string, unknown>).sort()) {
         sorted[k] = sortKeys((val as Record<string, unknown>)[k]);
@@ -40,21 +44,26 @@ const BINARY_FIELDS = new Set(["p", "s", "f"]);
 
 /** Convert known binary fields from base64url strings to Buffers for CBOR encoding */
 export function binaryFieldsToBuffers(obj: unknown): unknown {
-    if (obj === null || typeof obj !== "object") return obj;
-    if (obj instanceof Uint8Array || Buffer.isBuffer(obj)) return obj;
-    if (Array.isArray(obj)) return obj.map(binaryFieldsToBuffers);
+    if (obj === null || typeof obj !== "object") {
+        return obj;
+    }
+    if (obj instanceof Uint8Array || Buffer.isBuffer(obj)) {
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(binaryFieldsToBuffers);
+    }
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
         if (BINARY_FIELDS.has(k) && typeof v === "string") {
             result[k] = fromBase64url(v);
         } else if (BINARY_FIELDS.has(k) && Array.isArray(v)) {
-            result[k] = v.map((item) =>
-                typeof item === "string"
-                    ? fromBase64url(item)
-                    : item instanceof Uint8Array || Buffer.isBuffer(item)
-                      ? item
-                      : item,
-            );
+            result[k] = v.map((item) => {
+                if (typeof item === "string") {
+                    return fromBase64url(item);
+                }
+                return item;
+            });
         } else {
             result[k] = binaryFieldsToBuffers(v);
         }
@@ -64,9 +73,15 @@ export function binaryFieldsToBuffers(obj: unknown): unknown {
 
 /** Convert byte string fields back to base64url strings after CBOR decoding */
 export function buffersToBase64url(obj: unknown): unknown {
-    if (obj === null || typeof obj !== "object") return obj;
-    if (obj instanceof Uint8Array || Buffer.isBuffer(obj)) return toBase64url(obj);
-    if (Array.isArray(obj)) return obj.map(buffersToBase64url);
+    if (obj === null || typeof obj !== "object") {
+        return obj;
+    }
+    if (obj instanceof Uint8Array || Buffer.isBuffer(obj)) {
+        return toBase64url(obj);
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(buffersToBase64url);
+    }
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
         if (BINARY_FIELDS.has(k) && (v instanceof Uint8Array || Buffer.isBuffer(v))) {

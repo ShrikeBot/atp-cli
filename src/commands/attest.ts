@@ -40,8 +40,12 @@ const attest = new Command("attest")
         };
         validateTimestamp(doc.ts as number, "Attestation");
 
-        if (opts.stake) doc.stake = opts.stake;
-        if (opts.context) doc.ctx = opts.context;
+        if (opts.stake) {
+            doc.stake = opts.stake;
+        }
+        if (opts.context) {
+            doc.ctx = opts.context;
+        }
 
         // Validate before signing
         AttestationUnsignedSchema.parse(doc);

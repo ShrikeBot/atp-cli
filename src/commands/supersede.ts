@@ -34,10 +34,14 @@ function collectPair(collection: string) {
 
 /** Build structured metadata object from collected tuples */
 function buildMetadata(tuples: string[][]): Record<string, [string, string][]> | undefined {
-    if (tuples.length === 0) return undefined;
+    if (tuples.length === 0) {
+        return undefined;
+    }
     const m: Record<string, [string, string][]> = {};
     for (const [collection, key, value] of tuples) {
-        if (!m[collection]) m[collection] = [];
+        if (!m[collection]) {
+            m[collection] = [];
+        }
         m[collection].push([key, value]);
     }
     return m;
@@ -123,9 +127,15 @@ const supersede = new Command("supersede")
             reason: opts.reason,
             ts: Math.floor(Date.now() / 1000),
         };
-        if (m) doc.m = m;
-        if (opts.vnb) doc.vnb = opts.vnb;
-        if (opts.vna) doc.vna = opts.vna;
+        if (m) {
+            doc.m = m;
+        }
+        if (opts.vnb) {
+            doc.vnb = opts.vnb;
+        }
+        if (opts.vna) {
+            doc.vna = opts.vna;
+        }
         validateTimestamp(doc.ts as number, "Supersession");
 
         // Validate before signing

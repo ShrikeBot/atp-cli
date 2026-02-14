@@ -45,7 +45,9 @@ const revoke = new Command("revoke")
         } else {
             key = await loadPrivateKeyByFile(opts.identity!);
         }
-        if (opts.vnb) doc.vnb = parseInt(opts.vnb as string);
+        if (opts.vnb) {
+            doc.vnb = parseInt(opts.vnb as string);
+        }
         const format = opts.encoding ?? "json";
         const sig = sign(doc, key.privateKey, format);
         doc.s = { f: fp, sig: format === "cbor" ? sig : toBase64url(sig) };

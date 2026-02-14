@@ -34,7 +34,9 @@ const heartbeat = new Command("heartbeat")
         };
         validateTimestamp(doc.ts as number, "Heartbeat");
 
-        if (opts.msg) doc.msg = opts.msg;
+        if (opts.msg) {
+            doc.msg = opts.msg;
+        }
 
         // Validate before signing
         HeartbeatUnsignedSchema.parse(doc);

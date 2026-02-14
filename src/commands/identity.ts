@@ -40,10 +40,14 @@ function collectPair(collection: string) {
 
 /** Build structured metadata object from collected tuples */
 function buildMetadata(tuples: string[][]): Record<string, [string, string][]> | undefined {
-    if (tuples.length === 0) return undefined;
+    if (tuples.length === 0) {
+        return undefined;
+    }
     const m: Record<string, [string, string][]> = {};
     for (const [collection, key, value] of tuples) {
-        if (!m[collection]) m[collection] = [];
+        if (!m[collection]) {
+            m[collection] = [];
+        }
         m[collection].push([key, value]);
     }
     return m;
@@ -154,12 +158,16 @@ identity
             ...((opts.wallet as unknown as string[][]) || []),
         ];
         const m = buildMetadata(allTuples);
-        if (m) doc.m = m;
+        if (m) {
+            doc.m = m;
+        }
 
         // Validate before signing
         IdentityUnsignedSchema.parse(doc);
 
-        if (opts.vna) doc.vna = opts.vna;
+        if (opts.vna) {
+            doc.vna = opts.vna;
+        }
 
         const format = (opts.encoding as string) ?? "json";
         const sig = sign(doc, privateKey, format);
@@ -170,12 +178,10 @@ identity
         if (opts.output) {
             await writeFile(opts.output as string, output);
             console.error(`Identity written to: ${opts.output}`);
+        } else if (format === "cbor") {
+            process.stdout.write(output);
         } else {
-            if (format === "cbor") {
-                process.stdout.write(output);
-            } else {
-                console.log(output.toString("utf8"));
-            }
+            console.log(output.toString("utf8"));
         }
     });
 
@@ -240,7 +246,8 @@ identity
     .option("--rpc-pass <pass>", "RPC password", "")
     .action(async (opts: Record<string, string | boolean | undefined>) => {
         const raw = await readFile(opts.file as string);
-        let contentType: string, data: Buffer;
+        let contentType: string;
+        let data: Buffer;
 
         try {
             JSON.parse(raw.toString("utf8"));
