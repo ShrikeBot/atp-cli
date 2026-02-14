@@ -31,7 +31,10 @@ describe('MockExplorer', () => {
     const pubB64 = toBase64url(publicKey);
 
     explorer.addIdentity({
-      v: '1.0', t: 'id', n: 'TestAgent', f: fp,
+      v: '1.0',
+      t: 'id',
+      n: 'TestAgent',
+      f: fp,
       k: { t: 'ed25519', p: pubB64 },
     });
 
@@ -51,12 +54,18 @@ describe('MockExplorer', () => {
     const fp2 = computeFingerprint(key2.publicKey, 'ed25519');
 
     explorer.addIdentity({
-      v: '1.0', t: 'id', n: 'ChainAgent', f: fp1,
+      v: '1.0',
+      t: 'id',
+      n: 'ChainAgent',
+      f: fp1,
       k: { t: 'ed25519', p: toBase64url(key1.publicKey) },
     });
 
     explorer.addSupersession(fp1, fp2, {
-      v: '1.0', t: 'super', n: 'ChainAgent', reason: 'key-rotation',
+      v: '1.0',
+      t: 'super',
+      n: 'ChainAgent',
+      reason: 'key-rotation',
       k: { t: 'ed25519', p: toBase64url(key2.publicKey) },
       target: { f: fp1 },
     });
@@ -85,14 +94,23 @@ describe('MockExplorer', () => {
     const fp = computeFingerprint(publicKey, 'ed25519');
 
     explorer.addIdentity({
-      v: '1.0', t: 'id', n: 'RevokedAgent', f: fp,
+      v: '1.0',
+      t: 'id',
+      n: 'RevokedAgent',
+      f: fp,
       k: { t: 'ed25519', p: toBase64url(publicKey) },
     });
 
-    explorer.addRevocation(fp, {
-      v: '1.0', t: 'revoke', reason: 'key-compromised',
-      target: { f: fp },
-    }, fp);
+    explorer.addRevocation(
+      fp,
+      {
+        v: '1.0',
+        t: 'revoke',
+        reason: 'key-compromised',
+        target: { f: fp },
+      },
+      fp,
+    );
 
     const identity = await client.getIdentity(fp);
     expect(identity.status).toBe('revoked:key-compromised');
@@ -125,16 +143,25 @@ describe('MockExplorer', () => {
     const fp3 = computeFingerprint(key3.publicKey, 'ed25519');
 
     explorer.addIdentity({
-      v: '1.0', t: 'id', n: 'HopAgent', f: fp1,
+      v: '1.0',
+      t: 'id',
+      n: 'HopAgent',
+      f: fp1,
       k: { t: 'ed25519', p: toBase64url(key1.publicKey) },
     });
     explorer.addSupersession(fp1, fp2, {
-      v: '1.0', t: 'super', n: 'HopAgent', reason: 'key-rotation',
+      v: '1.0',
+      t: 'super',
+      n: 'HopAgent',
+      reason: 'key-rotation',
       k: { t: 'ed25519', p: toBase64url(key2.publicKey) },
       target: { f: fp1 },
     });
     explorer.addSupersession(fp2, fp3, {
-      v: '1.0', t: 'super', n: 'HopAgent', reason: 'key-rotation',
+      v: '1.0',
+      t: 'super',
+      n: 'HopAgent',
+      reason: 'key-rotation',
       k: { t: 'ed25519', p: toBase64url(key3.publicKey) },
       target: { f: fp2 },
     });

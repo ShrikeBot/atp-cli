@@ -49,7 +49,9 @@ async function fetchDoc(
     try {
       extracted = extractInscriptionFromWitness(witness[i]!);
       break;
-    } catch { /* try next */ }
+    } catch {
+      /* try next */
+    }
   }
   if (!extracted) throw new Error('No inscription found in any witness element');
   const { contentType, data } = extracted;
@@ -104,7 +106,9 @@ async function resolveCurrentKey(
 
   // Explorer says the current key is at this TXID — verify it on-chain
   const currentTxid = identity.ref.id;
-  console.log(`  Explorer: current identity at ${currentTxid} (chain depth ${identity.chain_depth})`);
+  console.log(
+    `  Explorer: current identity at ${currentTxid} (chain depth ${identity.chain_depth})`,
+  );
 
   // Fetch and verify the document from RPC (trust anchor)
   const doc = await fetchDoc({ net: identity.ref.net, id: currentTxid }, opts);
@@ -122,7 +126,7 @@ async function resolveCurrentKey(
   if (fingerprint !== identity.current_fingerprint) {
     throw new Error(
       `Explorer claims current fingerprint is ${identity.current_fingerprint} ` +
-      `but on-chain document has ${fingerprint}`
+        `but on-chain document has ${fingerprint}`,
     );
   }
 
@@ -160,7 +164,7 @@ async function resolveChainKeys(
     if (fingerprint !== entry.fingerprint) {
       throw new Error(
         `Chain entry claims fingerprint ${entry.fingerprint} ` +
-        `but on-chain document has ${fingerprint}`
+          `but on-chain document has ${fingerprint}`,
       );
     }
     keys.push({ pubBytes, keyType, fingerprint });
@@ -211,7 +215,9 @@ const verifyCmd = new Command('verify')
         try {
           extracted = extractInscriptionFromWitness(witness[i]!);
           break;
-        } catch { /* try next */ }
+        } catch {
+          /* try next */
+        }
       }
       if (!extracted) {
         console.error('No inscription found in any witness element');
@@ -250,7 +256,9 @@ const verifyCmd = new Command('verify')
         validateTimestamp(doc.ts as number, 'Document');
         console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
       } catch (e) {
-        console.error(`Warning: ${(e as Error).message} (ts is advisory — block time is authoritative)`);
+        console.error(
+          `Warning: ${(e as Error).message} (ts is advisory — block time is authoritative)`,
+        );
       }
     } else {
       console.log(`Timestamp: not present (optional)`);
@@ -304,7 +312,9 @@ const verifyCmd = new Command('verify')
             const resolved = await resolveIdentity(from.ref, verifyOpts);
             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
             if (from.f !== resolved.fingerprint) {
-              console.error(`  ✗ Fingerprint mismatch: doc says ${from.f}, resolved ${resolved.fingerprint}`);
+              console.error(
+                `  ✗ Fingerprint mismatch: doc says ${from.f}, resolved ${resolved.fingerprint}`,
+              );
               process.exit(1);
             } else {
               console.log(`  Fingerprint match: ✓`);
@@ -313,7 +323,9 @@ const verifyCmd = new Command('verify')
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
-            console.error(`Error: could not resolve attestor's identity via ref: ${(e as Error).message}`);
+            console.error(
+              `Error: could not resolve attestor's identity via ref: ${(e as Error).message}`,
+            );
             process.exit(1);
           }
           break;
@@ -329,7 +341,9 @@ const verifyCmd = new Command('verify')
             const resolved = await resolveIdentity(ref, verifyOpts);
             console.log(`  Resolved identity: ${resolved.fingerprint}`);
             if (f !== resolved.fingerprint) {
-              console.error(`  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`);
+              console.error(
+                `  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`,
+              );
               process.exit(1);
             } else {
               console.log(`  Fingerprint match: ✓`);
@@ -356,20 +370,26 @@ const verifyCmd = new Command('verify')
             const oldKey = await resolveIdentity(target.ref, verifyOpts);
             console.log(`  Resolved old identity: ${oldKey.fingerprint}`);
             if (target.f !== oldKey.fingerprint) {
-              console.error(`  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${oldKey.fingerprint}`);
+              console.error(
+                `  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${oldKey.fingerprint}`,
+              );
               process.exit(1);
             } else {
               console.log(`  Target fingerprint match: ✓`);
             }
             const sigs = doc.s as Array<{ f: string; sig: string | Uint8Array }>;
-            const oldSigBytes = typeof sigs[0].sig === 'string' ? fromBase64url(sigs[0].sig) : sigs[0].sig;
-            const newSigBytes = typeof sigs[1].sig === 'string' ? fromBase64url(sigs[1].sig) : sigs[1].sig;
+            const oldSigBytes =
+              typeof sigs[0].sig === 'string' ? fromBase64url(sigs[0].sig) : sigs[0].sig;
+            const newSigBytes =
+              typeof sigs[1].sig === 'string' ? fromBase64url(sigs[1].sig) : sigs[1].sig;
             const oldValid = verify(doc, oldKey.pubBytes, oldSigBytes, format, oldKey.keyType);
             sigValid('Old key signature', oldValid, oldKey.fingerprint);
             const newValid = verify(doc, newPubBytes, newSigBytes, format, k.t);
             sigValid('New key signature', newValid, newFp);
           } catch (e) {
-            console.error(`Error: could not resolve old identity via target.ref: ${(e as Error).message}`);
+            console.error(
+              `Error: could not resolve old identity via target.ref: ${(e as Error).message}`,
+            );
             process.exit(1);
           }
           break;
@@ -387,7 +407,9 @@ const verifyCmd = new Command('verify')
             const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
             sigValid('Signature', valid, resolved.fingerprint);
           } catch (e) {
-            console.error(`Error: could not resolve target identity via target.ref: ${(e as Error).message}`);
+            console.error(
+              `Error: could not resolve target identity via target.ref: ${(e as Error).message}`,
+            );
             process.exit(1);
           }
           break;
@@ -423,7 +445,9 @@ const verifyCmd = new Command('verify')
                 }
               }
               if (!matched) {
-                console.error('  ✗ Signature does not match any key in the attestor\'s supersession chain.');
+                console.error(
+                  "  ✗ Signature does not match any key in the attestor's supersession chain.",
+                );
                 process.exit(1);
               }
             } else {
@@ -433,40 +457,59 @@ const verifyCmd = new Command('verify')
               const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
               if (!valid) {
                 console.error('  Signature does not match original attestor key.');
-                console.error('  Note: spec §4.6 allows successor keys in the supersession chain to revoke.');
+                console.error(
+                  '  Note: spec §4.6 allows successor keys in the supersession chain to revoke.',
+                );
                 console.error('  Full chain verification requires --explorer-url. Failing.');
                 process.exit(1);
               }
               sigValid('Signature', valid, resolved.fingerprint);
             }
           } catch (e) {
-            console.error(`Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`);
+            console.error(
+              `Error: could not resolve original attestation or attestor identity: ${(e as Error).message}`,
+            );
             process.exit(1);
           }
           break;
         }
 
         case 'rcpt': {
-          const parties = doc.p as Array<{ f: string; ref: { net: string; id: string }; role: string }>;
+          const parties = doc.p as Array<{
+            f: string;
+            ref: { net: string; id: string };
+            role: string;
+          }>;
           const sigs = doc.s as Array<{ f: string; sig: string | Uint8Array }>;
           console.log(`  Receipt with ${parties.length} parties`);
           for (let i = 0; i < parties.length; i++) {
             const party = parties[i];
             console.log(`  Party ${i} (${party.role}): ${party.f}`);
-            if (sigs[i] && sigs[i].sig && (typeof sigs[i].sig !== 'string' || (sigs[i].sig as string).length > 0)) {
+            if (
+              sigs[i] &&
+              sigs[i].sig &&
+              (typeof sigs[i].sig !== 'string' || (sigs[i].sig as string).length > 0)
+            ) {
               try {
                 const resolved = await resolveIdentity(party.ref, verifyOpts);
                 if (party.f !== resolved.fingerprint) {
-                  console.error(`    ✗ Fingerprint mismatch: doc says ${party.f}, resolved ${resolved.fingerprint}`);
+                  console.error(
+                    `    ✗ Fingerprint mismatch: doc says ${party.f}, resolved ${resolved.fingerprint}`,
+                  );
                   process.exit(1);
                 } else {
                   console.log(`    Fingerprint match: ✓`);
                 }
-                const sigBytes = typeof sigs[i].sig === 'string' ? fromBase64url(sigs[i].sig as string) : (sigs[i].sig as Uint8Array);
+                const sigBytes =
+                  typeof sigs[i].sig === 'string'
+                    ? fromBase64url(sigs[i].sig as string)
+                    : (sigs[i].sig as Uint8Array);
                 const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                 sigValid(`  Party ${i} signature`, valid, resolved.fingerprint);
               } catch (e) {
-                console.error(`Error: could not resolve party ${i}'s identity: ${(e as Error).message}`);
+                console.error(
+                  `Error: could not resolve party ${i}'s identity: ${(e as Error).message}`,
+                );
                 process.exit(1);
               }
             } else {

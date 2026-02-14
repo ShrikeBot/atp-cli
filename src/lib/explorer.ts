@@ -87,7 +87,9 @@ export class ExplorerClient {
       try {
         const parsed = JSON.parse(body);
         if (parsed.error?.message) errorMsg = `Explorer: ${parsed.error.message}`;
-      } catch { /* use default */ }
+      } catch {
+        /* use default */
+      }
       throw new Error(errorMsg);
     }
     return res.json() as Promise<T>;

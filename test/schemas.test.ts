@@ -87,7 +87,10 @@ describe('Identity Schema', () => {
       ts: NOW,
       s: { f: FAKE_FP, sig: FAKE_SIG },
       m: {
-        links: [['twitter', '@shrikey_'], ['github', 'ShrikeBot']],
+        links: [
+          ['twitter', '@shrikey_'],
+          ['github', 'ShrikeBot'],
+        ],
         wallets: [['bitcoin', 'bc1qtest']],
       },
     };

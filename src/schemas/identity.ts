@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { VersionSchema, TimestampSchema, KeySchema, SignatureObjectSchema } from './common.js';
 
 /** Structured metadata: named collections of key-value tuples */
-export const MetadataSchema = z.record(z.string(), z.array(z.tuple([z.string(), z.string()]))).optional();
+export const MetadataSchema = z
+  .record(z.string(), z.array(z.tuple([z.string(), z.string()])))
+  .optional();
 
 export const IdentitySchema = z.object({
   v: VersionSchema,

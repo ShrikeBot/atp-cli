@@ -22,7 +22,9 @@ key
     if (!opts.force) {
       try {
         await access(keyFile);
-        console.error(`Error: Key ${keyData.fingerprint} already exists in store. Use --force to overwrite.`);
+        console.error(
+          `Error: Key ${keyData.fingerprint} already exists in store. Use --force to overwrite.`,
+        );
         process.exit(1);
       } catch {
         // doesn't exist, good
@@ -70,7 +72,13 @@ key
     switch (opts.format) {
       case 'json':
         if (opts.publicOnly) {
-          console.log(JSON.stringify({ type: data.type, fingerprint: data.fingerprint, publicKey: data.publicKey }, null, 2));
+          console.log(
+            JSON.stringify(
+              { type: data.type, fingerprint: data.fingerprint, publicKey: data.publicKey },
+              null,
+              2,
+            ),
+          );
         } else {
           console.log(JSON.stringify(data, null, 2));
         }

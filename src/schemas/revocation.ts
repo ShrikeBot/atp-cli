@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { VersionSchema, TimestampSchema, ReferenceSchema, SignatureObjectSchema } from './common.js';
+import {
+  VersionSchema,
+  TimestampSchema,
+  ReferenceSchema,
+  SignatureObjectSchema,
+} from './common.js';
 
 export const RevocationSchema = z.object({
   v: VersionSchema,

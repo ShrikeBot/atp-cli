@@ -18,7 +18,10 @@ export function fetchDocument(chain: MockChain, txid: string): Record<string, un
 }
 
 /** Get public key bytes from an identity document */
-function getPubKeyFromIdentity(doc: Record<string, unknown>): { pubBytes: Buffer; keyType: string } {
+function getPubKeyFromIdentity(doc: Record<string, unknown>): {
+  pubBytes: Buffer;
+  keyType: string;
+} {
   const kRaw = doc.k;
   const k = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { t: string; p: string };
   return { pubBytes: fromBase64url(k.p), keyType: k.t };

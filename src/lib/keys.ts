@@ -45,7 +45,8 @@ export async function generateKeypair(
   if (keyType !== 'ed25519' && keyType !== 'secp256k1') {
     throw new Error(`Key type "${keyType}" not yet supported. Use ed25519 or secp256k1.`);
   }
-  const { privateKey, publicKey } = keyType === 'secp256k1' ? generateSecp256k1() : generateEd25519();
+  const { privateKey, publicKey } =
+    keyType === 'secp256k1' ? generateSecp256k1() : generateEd25519();
   const fingerprint = computeFingerprint(publicKey, keyType);
 
   await ensureKeysDir();
@@ -131,9 +132,7 @@ export async function loadPrivateKeyFromFile(
         try {
           privBytes = fromBase64url(text);
           if (privBytes.length !== 32) {
-            throw new Error(
-              `Decoded key is ${privBytes.length} bytes, expected 32 for Ed25519`,
-            );
+            throw new Error(`Decoded key is ${privBytes.length} bytes, expected 32 for Ed25519`);
           }
         } catch {
           throw new Error(
@@ -150,9 +149,10 @@ export async function loadPrivateKeyFromFile(
     throw new Error(`Private key is ${privBytes!.length} bytes, expected 32`);
   }
 
-  const pubBytes = keyType === 'secp256k1'
-    ? Buffer.from(secp256k1.getPublicKey(privBytes!, true))
-    : Buffer.from(ed25519.getPublicKey(privBytes!));
+  const pubBytes =
+    keyType === 'secp256k1'
+      ? Buffer.from(secp256k1.getPublicKey(privBytes!, true))
+      : Buffer.from(ed25519.getPublicKey(privBytes!));
   const fingerprint = computeFingerprint(pubBytes, keyType);
 
   return {
@@ -198,7 +198,9 @@ export async function loadPublicKeyFromFile(
         try {
           pubBytes = fromBase64url(text);
           if (!validSizes.includes(pubBytes.length)) {
-            throw new Error(`Decoded key is ${pubBytes.length} bytes, expected 32 (ed25519) or 33 (secp256k1)`);
+            throw new Error(
+              `Decoded key is ${pubBytes.length} bytes, expected 32 (ed25519) or 33 (secp256k1)`,
+            );
           }
         } catch {
           throw new Error('Cannot detect public key format');

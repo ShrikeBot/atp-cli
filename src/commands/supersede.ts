@@ -47,7 +47,10 @@ const supersede = new Command('supersede')
   .description('Create a supersession document (key rotation or metadata update)')
   .requiredOption('--old <file>', 'Old identity file')
   .requiredOption('--old-txid <txid>', 'Old identity inscription TXID')
-  .requiredOption('--reason <reason>', 'Reason: key-rotation, algorithm-upgrade, key-compromised, metadata-update')
+  .requiredOption(
+    '--reason <reason>',
+    'Reason: key-rotation, algorithm-upgrade, key-compromised, metadata-update',
+  )
   .requiredOption('--name <name>', 'Agent name for the new identity')
   .option('--old-private-key <file>', 'Old private key file (overrides key lookup)')
   .option('--new-private-key <file>', 'New private key file (if reusing an existing key)')
@@ -80,9 +83,10 @@ const supersede = new Command('supersede')
       newPublicKey = newKeyData.publicKey;
     } else if (opts.reason === 'metadata-update') {
       // Same key for metadata updates
-      const oldKeyData = opts.oldPrivateKey ?? opts.privateKey
-        ? await loadPrivateKeyFromFile((opts.oldPrivateKey ?? opts.privateKey)!, oldK.t)
-        : await loadPrivateKeyByFile(opts.old!);
+      const oldKeyData =
+        (opts.oldPrivateKey ?? opts.privateKey)
+          ? await loadPrivateKeyFromFile((opts.oldPrivateKey ?? opts.privateKey)!, oldK.t)
+          : await loadPrivateKeyByFile(opts.old!);
       newPrivateKey = oldKeyData.privateKey;
       newPublicKey = oldKeyData.publicKey;
     } else {

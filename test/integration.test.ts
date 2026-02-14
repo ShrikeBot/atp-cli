@@ -284,7 +284,14 @@ describe('Happy Path', () => {
     const keyB = makeKey();
     const { doc: idA, txid: txA } = createIdentity(chain, keyA, 'RotateAgent');
 
-    const { doc: superDoc } = createSupersession(chain, keyA, txA, keyB, 'RotateAgent', 'key-rotation');
+    const { doc: superDoc } = createSupersession(
+      chain,
+      keyA,
+      txA,
+      keyB,
+      'RotateAgent',
+      'key-rotation',
+    );
 
     expect(verifySupersession(superDoc, idA)).toBe(true);
     expect((superDoc.target as { f: string }).f).toBe(keyA.fingerprint);
@@ -297,7 +304,12 @@ describe('Happy Path', () => {
     const { doc: idDoc, txid } = createIdentity(chain, key, 'MetaAgent');
 
     const { doc: superDoc } = createSupersession(
-      chain, key, txid, key, 'MetaAgent v2', 'metadata-update',
+      chain,
+      key,
+      txid,
+      key,
+      'MetaAgent v2',
+      'metadata-update',
       { links: [['twitter', '@newhandle']] },
     );
 
@@ -337,8 +349,13 @@ describe('Happy Path', () => {
     const { txid: txB } = createIdentity(chain, keyB, 'Buyer');
 
     const { doc: rcpt } = createReceipt(
-      chain, keyA, txA, keyB.fingerprint, txB,
-      'Sold widget', 'exchange',
+      chain,
+      keyA,
+      txA,
+      keyB.fingerprint,
+      txB,
+      'Sold widget',
+      'exchange',
     );
 
     // Verify initiator signature
@@ -361,7 +378,12 @@ describe('Happy Path', () => {
 
     // Supersede 1→2
     const { doc: super1, txid: superTx1 } = createSupersession(
-      chain, key1, tx1, key2, 'ChainAgent', 'key-rotation',
+      chain,
+      key1,
+      tx1,
+      key2,
+      'ChainAgent',
+      'key-rotation',
     );
     expect(verifySupersession(super1, id1)).toBe(true);
 
@@ -369,7 +391,12 @@ describe('Happy Path', () => {
     // For the second supersession, we build an "identity-like" doc for key2 to verify against
     const id2Proxy: Record<string, unknown> = { k: { t: 'ed25519', p: key2.pubB64 } };
     const { doc: super2 } = createSupersession(
-      chain, key2, superTx1, key3, 'ChainAgent', 'key-rotation',
+      chain,
+      key2,
+      superTx1,
+      key3,
+      'ChainAgent',
+      'key-rotation',
     );
     expect(verifySupersession(super2, id2Proxy)).toBe(true);
 
@@ -405,8 +432,22 @@ describe('Failure Modes', () => {
     const keyC = makeKey();
     const { doc: idA, txid: txA } = createIdentity(chain, keyA, 'DoubleSuper');
 
-    const { txid: superTx1 } = createSupersession(chain, keyA, txA, keyB, 'DoubleSuper', 'key-rotation');
-    const { txid: superTx2 } = createSupersession(chain, keyA, txA, keyC, 'DoubleSuper', 'key-rotation');
+    const { txid: superTx1 } = createSupersession(
+      chain,
+      keyA,
+      txA,
+      keyB,
+      'DoubleSuper',
+      'key-rotation',
+    );
+    const { txid: superTx2 } = createSupersession(
+      chain,
+      keyA,
+      txA,
+      keyC,
+      'DoubleSuper',
+      'key-rotation',
+    );
 
     // First supersession came first
     expect(chain.isBefore(superTx1, superTx2)).toBe(true);
@@ -459,7 +500,14 @@ describe('Failure Modes', () => {
     const { txid: revTx } = createRevocation(chain, keyA, keyA.fingerprint, txA, 'defunct');
 
     // Then try to supersede (should be considered invalid by verifier since revocation came first)
-    const { txid: superTx } = createSupersession(chain, keyA, txA, keyB, 'RevokedSuper', 'key-rotation');
+    const { txid: superTx } = createSupersession(
+      chain,
+      keyA,
+      txA,
+      keyB,
+      'RevokedSuper',
+      'key-rotation',
+    );
 
     expect(chain.isBefore(revTx, superTx)).toBe(true);
   });
@@ -505,11 +553,21 @@ describe('Poison Pill (Chain Revocation)', () => {
 
     const { doc: idA, txid: txA } = createIdentity(chain, keyA, 'PoisonAgent');
     const { doc: superAB, txid: txAB } = createSupersession(
-      chain, keyA, txA, keyB, 'PoisonAgent', 'key-rotation',
+      chain,
+      keyA,
+      txA,
+      keyB,
+      'PoisonAgent',
+      'key-rotation',
     );
     const idBProxy: Record<string, unknown> = { k: { t: 'ed25519', p: keyB.pubB64 } };
     const { doc: superBC, txid: txBC } = createSupersession(
-      chain, keyB, txAB, keyC, 'PoisonAgent', 'key-rotation',
+      chain,
+      keyB,
+      txAB,
+      keyC,
+      'PoisonAgent',
+      'key-rotation',
     );
 
     return { keyA, keyB, keyC, idA, superAB, superBC, txA, txAB, txBC, idBProxy };
@@ -571,7 +629,12 @@ describe('Edge Cases', () => {
     const { doc: id1, txid: tx1 } = createIdentity(chain, key1, 'AlgoAgent');
 
     const { doc: superDoc } = createSupersession(
-      chain, key1, tx1, key2, 'AlgoAgent', 'key-rotation',
+      chain,
+      key1,
+      tx1,
+      key2,
+      'AlgoAgent',
+      'key-rotation',
     );
     expect(verifySupersession(superDoc, id1)).toBe(true);
     // Both are ed25519 but different keys

@@ -6,7 +6,7 @@ import { sign, verify as verifySig } from '../lib/signing.js';
 import { computeFingerprint } from '../lib/fingerprint.js';
 import { loadPrivateKeyByFile, loadPrivateKeyFromFile } from '../lib/keys.js';
 import { ReceiptUnsignedSchema, BITCOIN_MAINNET } from '../schemas/index.js';
-import { resolveIdentity, fetchDoc } from './verify.js';
+import { resolveIdentity } from './verify.js';
 
 const receipt = new Command('receipt').description('Receipt management');
 
@@ -60,7 +60,7 @@ receipt
 
     doc.s = [
       { f: fromFp, sig: format === 'cbor' ? sig : toBase64url(sig) },
-      { f: (opts.with as string), sig: '' },
+      { f: opts.with as string, sig: '' },
     ];
 
     const output = encodeDocument(doc, format);
@@ -129,22 +129,34 @@ receipt
       try {
         resolved = await resolveIdentity(parties[i].ref, rpcOpts);
       } catch (e) {
-        console.error(`Error: could not resolve party ${i}'s identity (${parties[i].f}): ${(e as Error).message}`);
+        console.error(
+          `Error: could not resolve party ${i}'s identity (${parties[i].f}): ${(e as Error).message}`,
+        );
         console.error('Refusing to countersign without verified first signature.');
         process.exit(1);
       }
 
       // Verify fingerprint match
       if (resolved.fingerprint !== parties[i].f) {
-        console.error(`Error: party ${i} fingerprint mismatch — expected ${parties[i].f}, resolved ${resolved.fingerprint}`);
+        console.error(
+          `Error: party ${i} fingerprint mismatch — expected ${parties[i].f}, resolved ${resolved.fingerprint}`,
+        );
         process.exit(1);
       }
 
       // Verify signature
       const otherSigBytes = fromBase64url(sigs[i].sig as string);
-      const valid = verifySig(unsigned as Record<string, unknown>, resolved.pubBytes, otherSigBytes, format, resolved.keyType);
+      const valid = verifySig(
+        unsigned as Record<string, unknown>,
+        resolved.pubBytes,
+        otherSigBytes,
+        format,
+        resolved.keyType,
+      );
       if (!valid) {
-        console.error(`Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`);
+        console.error(
+          `Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`,
+        );
         process.exit(1);
       }
       console.error(`Party ${i} (${parties[i].role}) signature: ✓ VALID`);
@@ -155,7 +167,10 @@ receipt
       ? await loadPrivateKeyFromFile(opts.privateKey, myK.t)
       : await loadPrivateKeyByFile(opts.identity!);
     const sig = sign(unsigned as Record<string, unknown>, key.privateKey, format);
-    sigs[myIndex] = { f: myFp, sig: format === 'cbor' ? sig as unknown as string : toBase64url(sig) };
+    sigs[myIndex] = {
+      f: myFp,
+      sig: format === 'cbor' ? (sig as unknown as string) : toBase64url(sig),
+    };
     doc.s = sigs;
 
     const output = encodeDocument(doc, format);

@@ -49,7 +49,11 @@ export function binaryFieldsToBuffers(obj: unknown): unknown {
       result[k] = fromBase64url(v);
     } else if (BINARY_FIELDS.has(k) && Array.isArray(v)) {
       result[k] = v.map((item) =>
-        typeof item === 'string' ? fromBase64url(item) : item instanceof Uint8Array || Buffer.isBuffer(item) ? item : item,
+        typeof item === 'string'
+          ? fromBase64url(item)
+          : item instanceof Uint8Array || Buffer.isBuffer(item)
+            ? item
+            : item,
       );
     } else {
       result[k] = binaryFieldsToBuffers(v);
@@ -101,7 +105,9 @@ export function encodeDocument(doc: Record<string, unknown>, format = 'json'): B
     output = Buffer.from(JSON.stringify(sortKeys(doc), null, 2), 'utf8');
   }
   if (output.length > MAX_DOCUMENT_SIZE) {
-    throw new Error(`Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`);
+    throw new Error(
+      `Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`,
+    );
   }
   return output;
 }

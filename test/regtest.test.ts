@@ -59,11 +59,19 @@ function bech32Encode(hrp: string, data5bit: number[]): string {
   const polymod = bech32Polymod(values.concat([0, 0, 0, 0, 0, 0])) ^ 1;
   const checksum: number[] = [];
   for (let i = 0; i < 6; i++) checksum.push((polymod >> (5 * (5 - i))) & 31);
-  return hrp + '1' + data5bit.concat(checksum).map(d => BECH32_CHARSET[d]).join('');
+  return (
+    hrp +
+    '1' +
+    data5bit
+      .concat(checksum)
+      .map((d) => BECH32_CHARSET[d])
+      .join('')
+  );
 }
 
 function convertBits(data: number[], fromBits: number, toBits: number, pad: boolean): number[] {
-  let acc = 0, bits = 0;
+  let acc = 0,
+    bits = 0;
   const ret: number[] = [];
   const maxv = (1 << toBits) - 1;
   for (const v of data) {
@@ -105,7 +113,14 @@ function bech32mEncode(hrp: string, data5bit: number[]): string {
   const polymod = bech32mPolymod(values.concat([0, 0, 0, 0, 0, 0])) ^ 0x2bc830a3;
   const checksum: number[] = [];
   for (let i = 0; i < 6; i++) checksum.push((polymod >> (5 * (5 - i))) & 31);
-  return hrp + '1' + data5bit.concat(checksum).map(d => BECH32_CHARSET[d]).join('');
+  return (
+    hrp +
+    '1' +
+    data5bit
+      .concat(checksum)
+      .map((d) => BECH32_CHARSET[d])
+      .join('')
+  );
 }
 
 /** Encode a P2TR address for regtest (witness v1) */
@@ -155,7 +170,8 @@ function computeTaprootOutput(script: Buffer): {
   // This is the x-only key from hash of "TapTweak" with empty data
   // For simplicity, use a fixed known point on secp256k1
   const internalKeyBytes = Buffer.from(
-    '50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0', 'hex'
+    '50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0',
+    'hex',
   ); // NUMS point (x-only, 32 bytes)
 
   const leafHash = tapLeafHash(script);
@@ -165,7 +181,7 @@ function computeTaprootOutput(script: Buffer): {
 
   // Tweaked key: P + t*G
   const P = secp256k1.ProjectivePoint.fromHex(
-    Buffer.concat([Buffer.from([0x02]), internalKeyBytes])
+    Buffer.concat([Buffer.from([0x02]), internalKeyBytes]),
   );
   const tweakScalar = BigInt('0x' + tweak.toString('hex'));
   const T = secp256k1.ProjectivePoint.BASE.multiply(tweakScalar);
@@ -182,10 +198,7 @@ function computeTaprootOutput(script: Buffer): {
 
   // Control block: leaf_version | parity_bit, internal_key
   const controlByte = LEAF_VERSION_TAPSCRIPT | parity;
-  const controlBlock = Buffer.concat([
-    Buffer.from([controlByte]),
-    internalKeyBytes,
-  ]);
+  const controlBlock = Buffer.concat([Buffer.from([controlByte]), internalKeyBytes]);
 
   // scriptPubKey: OP_1 <32-byte-output-key>
   const scriptPubKey = Buffer.concat([
@@ -223,10 +236,10 @@ function computeTaprootOutput(script: Buffer): {
 function buildRealInscriptionEnvelope(data: Buffer, contentType: string): Buffer {
   const ct = Buffer.from(contentType, 'ascii');
   const parts: Buffer[] = [
-    Buffer.from([0x00, 0x63]),  // OP_FALSE OP_IF
-    Buffer.from([0x03]),        // OP_PUSH3
+    Buffer.from([0x00, 0x63]), // OP_FALSE OP_IF
+    Buffer.from([0x03]), // OP_PUSH3
     Buffer.from('ord', 'ascii'),
-    Buffer.from([0x01, 0x01]),  // PUSH1 byte 0x01 (content-type tag)
+    Buffer.from([0x01, 0x01]), // PUSH1 byte 0x01 (content-type tag)
   ];
 
   // Push content type
@@ -309,15 +322,27 @@ function readPushData(buf: Buffer, pos: number): { value: Buffer; newPos: number
 // ── Raw transaction builder (segwit with custom witness) ─────────────
 
 function writeUint32LE(n: number): Buffer {
-  const b = Buffer.alloc(4); b.writeUInt32LE(n); return b;
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(n);
+  return b;
 }
 function writeUint64LE(n: bigint): Buffer {
-  const b = Buffer.alloc(8); b.writeBigUInt64LE(n); return b;
+  const b = Buffer.alloc(8);
+  b.writeBigUInt64LE(n);
+  return b;
 }
 function writeVarInt(n: number): Buffer {
   if (n < 0xfd) return Buffer.from([n]);
-  if (n <= 0xffff) { const b = Buffer.alloc(3); b[0] = 0xfd; b.writeUInt16LE(n, 1); return b; }
-  const b = Buffer.alloc(5); b[0] = 0xfe; b.writeUInt32LE(n, 1); return b;
+  if (n <= 0xffff) {
+    const b = Buffer.alloc(3);
+    b[0] = 0xfd;
+    b.writeUInt16LE(n, 1);
+    return b;
+  }
+  const b = Buffer.alloc(5);
+  b[0] = 0xfe;
+  b.writeUInt32LE(n, 1);
+  return b;
 }
 function writeVarBytes(data: Buffer): Buffer {
   return Buffer.concat([writeVarInt(data.length), data]);
@@ -377,7 +402,9 @@ let bitcoindAvailable = false;
 try {
   execSync(`${BITCOIND_PATH} --version`, { stdio: 'pipe' });
   bitcoindAvailable = true;
-} catch { /* skip */ }
+} catch {
+  /* skip */
+}
 
 // ── Suite ────────────────────────────────────────────────────────────
 
@@ -403,7 +430,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     return cli(`generatetoaddress ${n} ${addr}`);
   }
 
-  async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+  async function sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
 
   /**
    * Inscribe an ATP document onto regtest using a P2WSH script-path spend.
@@ -429,16 +458,16 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     mine(1);
 
     // Find the UTXO (vout)
-    const commitTxRaw = await rpcCall('getrawtransaction', [commitTxid, true]) as {
+    const commitTxRaw = (await rpcCall('getrawtransaction', [commitTxid, true])) as {
       vout: Array<{ n: number; value: number; scriptPubKey: { hex: string } }>;
     };
     const spkHex = scriptPubKey.toString('hex');
-    const vout = commitTxRaw.vout.find(o => o.scriptPubKey.hex === spkHex);
+    const vout = commitTxRaw.vout.find((o) => o.scriptPubKey.hex === spkHex);
     if (!vout) throw new Error(`Could not find P2TR output in commit tx ${commitTxid}`);
 
     // Get a destination address for the reveal output
     const destAddr = cli('getnewaddress "" bech32');
-    const destInfo = await rpcCall('getaddressinfo', [destAddr]) as { scriptPubKey: string };
+    const destInfo = (await rpcCall('getaddressinfo', [destAddr])) as { scriptPubKey: string };
     const destScriptPubKey = Buffer.from(destInfo.scriptPubKey, 'hex');
 
     // Build reveal tx — Taproot script-path spend
@@ -448,16 +477,15 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const fee = 5000n;
     const outputSats = inputSats - fee;
 
-    const revealTxBytes = buildWitnessTx(
-      commitTxid,
-      vout.n,
-      destScriptPubKey,
-      outputSats,
-      [taprootScript, controlBlock],
-    );
+    const revealTxBytes = buildWitnessTx(commitTxid, vout.n, destScriptPubKey, outputSats, [
+      taprootScript,
+      controlBlock,
+    ]);
 
     // Broadcast reveal
-    const revealTxid = await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')]) as string;
+    const revealTxid = (await rpcCall('sendrawtransaction', [
+      revealTxBytes.toString('hex'),
+    ])) as string;
     mine(1);
 
     return revealTxid;
@@ -465,7 +493,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
 
   /** Fetch and extract an ATP document from a real on-chain transaction */
   async function fetchDoc(txid: string): Promise<Record<string, unknown>> {
-    const tx = await rpcCall('getrawtransaction', [txid, true]) as {
+    const tx = (await rpcCall('getrawtransaction', [txid, true])) as {
       vin: Array<{ txinwitness?: string[] }>;
     };
     const witness = tx.vin[0]?.txinwitness;
@@ -475,7 +503,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       try {
         const { data } = extractRealInscription(witness[i]!);
         return JSON.parse(data.toString('utf8'));
-      } catch { /* try next */ }
+      } catch {
+        /* try next */
+      }
     }
     throw new Error(`No inscription found in any witness element of tx ${txid}`);
   }
@@ -484,10 +514,21 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   function runVerify(source: string): { exitCode: number; stdout: string; stderr: string } {
     const rpcUrl = `http://127.0.0.1:${RPC_PORT}`;
     try {
-      const stdout = execFileSync('node', [
-        join(__dirname, '..', 'dist', 'index.js'), 'verify', source,
-        '--rpc-url', rpcUrl, '--rpc-user', RPC_USER, '--rpc-pass', RPC_PASS,
-      ], { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] });
+      const stdout = execFileSync(
+        'node',
+        [
+          join(__dirname, '..', 'dist', 'index.js'),
+          'verify',
+          source,
+          '--rpc-url',
+          rpcUrl,
+          '--rpc-user',
+          RPC_USER,
+          '--rpc-pass',
+          RPC_PASS,
+        ],
+        { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] },
+      );
       return { exitCode: 0, stdout, stderr: '' };
     } catch (e: any) {
       return {
@@ -513,11 +554,18 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     return { privateKey, publicKey, fingerprint, pubB64: toBase64url(publicKey) };
   }
 
-  function ts(): number { return Math.floor(Date.now() / 1000); }
+  function ts(): number {
+    return Math.floor(Date.now() / 1000);
+  }
 
-  async function createAndInscribeIdentity(key: KeyPair, name: string): Promise<{ doc: Record<string, unknown>; txid: string }> {
+  async function createAndInscribeIdentity(
+    key: KeyPair,
+    name: string,
+  ): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: name,
+      v: '1.0',
+      t: 'id',
+      n: name,
       k: [{ t: 'ed25519', p: key.pubB64 }],
       ts: ts(),
     };
@@ -529,10 +577,15 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   }
 
   async function createAndInscribeAttestation(
-    fromKey: KeyPair, fromTxid: string, toFp: string, toTxid: string, ctx?: string,
+    fromKey: KeyPair,
+    fromTxid: string,
+    toFp: string,
+    toTxid: string,
+    ctx?: string,
   ): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
-      v: '1.0', t: 'att',
+      v: '1.0',
+      t: 'att',
       from: { f: fromKey.fingerprint, ref: { net: NET, id: fromTxid } },
       to: { f: toFp, ref: { net: NET, id: toTxid } },
       ts: ts(),
@@ -546,11 +599,18 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   }
 
   async function createAndInscribeHeartbeat(
-    key: KeyPair, idTxid: string, seq: number, msg?: string,
+    key: KeyPair,
+    idTxid: string,
+    seq: number,
+    msg?: string,
   ): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
-      v: '1.0', t: 'hb', f: key.fingerprint,
-      ref: { net: NET, id: idTxid }, seq, ts: ts(),
+      v: '1.0',
+      t: 'hb',
+      f: key.fingerprint,
+      ref: { net: NET, id: idTxid },
+      seq,
+      ts: ts(),
     };
     if (msg) doc.msg = msg;
     HeartbeatUnsignedSchema.parse(doc);
@@ -561,12 +621,20 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   }
 
   async function createAndInscribeSupersession(
-    oldKey: KeyPair, oldTxid: string, newKey: KeyPair, name: string, reason: string,
+    oldKey: KeyPair,
+    oldTxid: string,
+    newKey: KeyPair,
+    name: string,
+    reason: string,
   ): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
-      v: '1.0', t: 'super',
+      v: '1.0',
+      t: 'super',
       target: { f: oldKey.fingerprint, ref: { net: NET, id: oldTxid } },
-      n: name, k: [{ t: 'ed25519', p: newKey.pubB64 }], reason, ts: ts(),
+      n: name,
+      k: [{ t: 'ed25519', p: newKey.pubB64 }],
+      reason,
+      ts: ts(),
     };
     SupersessionUnsignedSchema.parse(doc);
     const oldSig = sign(doc, oldKey.privateKey);
@@ -580,13 +648,17 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   }
 
   async function createAndInscribeRevocation(
-    signerKey: KeyPair, targetFp: string, targetTxid: string,
+    signerKey: KeyPair,
+    targetFp: string,
+    targetTxid: string,
     reason: 'key-compromised' | 'defunct',
   ): Promise<{ doc: Record<string, unknown>; txid: string }> {
     const doc: Record<string, unknown> = {
-      v: '1.0', t: 'revoke',
+      v: '1.0',
+      t: 'revoke',
       target: { f: targetFp, ref: { net: NET, id: targetTxid } },
-      reason, ts: ts(),
+      reason,
+      ts: ts(),
     };
     RevocationUnsignedSchema.parse(doc);
     const revSig = sign(doc, signerKey.privateKey);
@@ -620,7 +692,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   }
 
   function verifySupersessionDoc(
-    doc: Record<string, unknown>, oldKey: KeyPair, newKey: KeyPair,
+    doc: Record<string, unknown>,
+    oldKey: KeyPair,
+    newKey: KeyPair,
   ): boolean {
     const sigs = doc.s as Array<unknown>;
     return (
@@ -635,19 +709,23 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     datadir = mkdtempSync(join(tmpdir(), 'atp-regtest-'));
 
     // Start bitcoind
-    bitcoind = spawn(BITCOIND_PATH, [
-      '-regtest',
-      `-datadir=${datadir}`,
-      `-rpcport=${RPC_PORT}`,
-      `-rpcuser=${RPC_USER}`,
-      `-rpcpassword=${RPC_PASS}`,
-      '-txindex=1',
-      '-fallbackfee=0.00001',
-      '-server',
-      '-listen=0',
-      '-printtoconsole=0',
-      '-acceptnonstdtxn=1',
-    ], { stdio: 'ignore' });
+    bitcoind = spawn(
+      BITCOIND_PATH,
+      [
+        '-regtest',
+        `-datadir=${datadir}`,
+        `-rpcport=${RPC_PORT}`,
+        `-rpcuser=${RPC_USER}`,
+        `-rpcpassword=${RPC_PASS}`,
+        '-txindex=1',
+        '-fallbackfee=0.00001',
+        '-server',
+        '-listen=0',
+        '-printtoconsole=0',
+        '-acceptnonstdtxn=1',
+      ],
+      { stdio: 'ignore' },
+    );
 
     rpc = new BitcoinRPC(`http://127.0.0.1:${RPC_PORT}`, RPC_USER, RPC_PASS);
 
@@ -663,19 +741,34 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     }
 
     // Create wallet and mine 101 blocks for maturity
-    try { cli('createwallet default'); } catch { /* may already exist */ }
+    try {
+      cli('createwallet default');
+    } catch {
+      /* may already exist */
+    }
     mine(101);
   }, 120000);
 
   afterAll(async () => {
     if (bitcoind) {
-      try { cli('stop'); } catch { bitcoind.kill('SIGTERM'); }
-      await new Promise<void>(resolve => {
+      try {
+        cli('stop');
+      } catch {
+        bitcoind.kill('SIGTERM');
+      }
+      await new Promise<void>((resolve) => {
         bitcoind.on('exit', () => resolve());
-        setTimeout(() => { bitcoind.kill('SIGKILL'); resolve(); }, 10000);
+        setTimeout(() => {
+          bitcoind.kill('SIGKILL');
+          resolve();
+        }, 10000);
       });
     }
-    try { rmSync(datadir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(datadir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
   }, 30000);
 
   // ── Tests ──────────────────────────────────────────────────────────
@@ -702,7 +795,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const { txid: txB } = await createAndInscribeIdentity(keyB, 'AttesteeB');
 
     const { doc: att, txid: attTxid } = await createAndInscribeAttestation(
-      keyA, txA, keyB.fingerprint, txB, 'trusted peer',
+      keyA,
+      txA,
+      keyB.fingerprint,
+      txB,
+      'trusted peer',
     );
 
     const fetched = await fetchDoc(attTxid);
@@ -716,7 +813,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const { txid: txA } = await createAndInscribeIdentity(keyA, 'SuperAgent');
 
     const { doc, txid } = await createAndInscribeSupersession(
-      keyA, txA, keyB, 'SuperAgent', 'key-rotation',
+      keyA,
+      txA,
+      keyB,
+      'SuperAgent',
+      'key-rotation',
     );
 
     const fetched = await fetchDoc(txid);
@@ -729,7 +830,10 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const { txid: idTxid } = await createAndInscribeIdentity(key, 'RevokeMe');
 
     const { txid: revTxid } = await createAndInscribeRevocation(
-      key, key.fingerprint, idTxid, 'defunct',
+      key,
+      key.fingerprint,
+      idTxid,
+      'defunct',
     );
 
     const fetched = await fetchDoc(revTxid);
@@ -769,8 +873,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     expect(verifyIdentityDoc(doc2)).toBe(true);
 
     // First-seen-wins: tx1 has more confirmations (inscribed earlier)
-    const raw1 = await rpcCall('getrawtransaction', [tx1, true]) as { confirmations: number };
-    const raw2 = await rpcCall('getrawtransaction', [tx2, true]) as { confirmations: number };
+    const raw1 = (await rpcCall('getrawtransaction', [tx1, true])) as { confirmations: number };
+    const raw2 = (await rpcCall('getrawtransaction', [tx2, true])) as { confirmations: number };
     expect(raw1.confirmations).toBeGreaterThan(raw2.confirmations);
   }, 60000);
 
@@ -782,15 +886,26 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     // Build chain: A → B → C
     const { txid: txA } = await createAndInscribeIdentity(keyA, 'PoisonAgent');
     const { txid: txAB } = await createAndInscribeSupersession(
-      keyA, txA, keyB, 'PoisonAgent', 'key-rotation',
+      keyA,
+      txA,
+      keyB,
+      'PoisonAgent',
+      'key-rotation',
     );
     const { txid: txBC } = await createAndInscribeSupersession(
-      keyB, txAB, keyC, 'PoisonAgent', 'key-rotation',
+      keyB,
+      txAB,
+      keyC,
+      'PoisonAgent',
+      'key-rotation',
     );
 
     // Revoke from genesis key A — kills entire chain
     const { txid: revTxid } = await createAndInscribeRevocation(
-      keyA, keyA.fingerprint, txA, 'key-compromised',
+      keyA,
+      keyA.fingerprint,
+      txA,
+      'key-compromised',
     );
 
     const revDoc = await fetchDoc(revTxid);
@@ -816,7 +931,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     const key = makeKey();
     const { txid } = await createAndInscribeIdentity(key, 'RPCTest');
 
-    const tx = await rpc.getRawTransaction(txid) as {
+    const tx = (await rpc.getRawTransaction(txid)) as {
       txid: string;
       vin: Array<{ txinwitness?: string[] }>;
       confirmations: number;
@@ -831,7 +946,6 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   // ── Adversarial Tests ─────────────────────────────────────────────
 
   describe('adversarial tests', () => {
-
     // ── Helper: inscribe raw bytes with arbitrary content-type ──────
 
     async function inscribeRaw(data: Buffer, contentType: string): Promise<string> {
@@ -841,23 +955,25 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const addr = p2trAddress(outputKeyXOnly);
       const commitTxid = cli(`sendtoaddress ${addr} 0.001`);
       mine(1);
-      const commitTxRaw = await rpcCall('getrawtransaction', [commitTxid, true]) as {
+      const commitTxRaw = (await rpcCall('getrawtransaction', [commitTxid, true])) as {
         vout: Array<{ n: number; value: number; scriptPubKey: { hex: string } }>;
       };
       const spkHex = scriptPubKey.toString('hex');
-      const vout = commitTxRaw.vout.find(o => o.scriptPubKey.hex === spkHex);
+      const vout = commitTxRaw.vout.find((o) => o.scriptPubKey.hex === spkHex);
       if (!vout) throw new Error(`Could not find P2TR output in commit tx ${commitTxid}`);
       const destAddr = cli('getnewaddress "" bech32');
-      const destInfo = await rpcCall('getaddressinfo', [destAddr]) as { scriptPubKey: string };
+      const destInfo = (await rpcCall('getaddressinfo', [destAddr])) as { scriptPubKey: string };
       const destScriptPubKey = Buffer.from(destInfo.scriptPubKey, 'hex');
       const inputSats = BigInt(Math.round(vout.value * 1e8));
       const fee = 5000n;
       const outputSats = inputSats - fee;
-      const revealTxBytes = buildWitnessTx(
-        commitTxid, vout.n, destScriptPubKey, outputSats,
-        [taprootScript, controlBlock],
-      );
-      const revealTxid = await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')]) as string;
+      const revealTxBytes = buildWitnessTx(commitTxid, vout.n, destScriptPubKey, outputSats, [
+        taprootScript,
+        controlBlock,
+      ]);
+      const revealTxid = (await rpcCall('sendrawtransaction', [
+        revealTxBytes.toString('hex'),
+      ])) as string;
       mine(1);
       return revealTxid;
     }
@@ -877,7 +993,7 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const data = Buffer.from(JSON.stringify({ v: '1.0', t: 'id', n: 'Fake' }), 'utf8');
       const txid = await inscribeRaw(data, 'text/plain');
       // extractRealInscription will return the data, but it has wrong content-type
-      const tx = await rpcCall('getrawtransaction', [txid, true]) as {
+      const tx = (await rpcCall('getrawtransaction', [txid, true])) as {
         vin: Array<{ txinwitness?: string[] }>;
       };
       const witness = tx.vin[0]?.txinwitness;
@@ -888,7 +1004,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
           const result = extractRealInscription(witness![i]!);
           foundContentType = result.contentType;
           break;
-        } catch { /* try next */ }
+        } catch {
+          /* try next */
+        }
       }
       // Content-type should be text/plain — not ATP. A proper verifier should reject.
       expect(foundContentType).toBe('text/plain');
@@ -924,7 +1042,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-5: Huge payload (100KB) does not crash', async () => {
       const key = makeKey();
       const bigDoc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'HugePayload',
+        v: '1.0',
+        t: 'id',
+        n: 'HugePayload',
         k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: ts(),
         m: { data: Array.from({ length: 500 }, (_, i) => [`key${i}`, 'x'.repeat(200)]) },
@@ -938,23 +1058,23 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const addr = p2trAddress(outputKeyXOnly);
       const commitTxid = cli(`sendtoaddress ${addr} 0.01`);
       mine(1);
-      const commitTxRaw = await rpcCall('getrawtransaction', [commitTxid, true]) as {
+      const commitTxRaw = (await rpcCall('getrawtransaction', [commitTxid, true])) as {
         vout: Array<{ n: number; value: number; scriptPubKey: { hex: string } }>;
       };
       const spkHex = scriptPubKey.toString('hex');
-      const vout = commitTxRaw.vout.find(o => o.scriptPubKey.hex === spkHex);
+      const vout = commitTxRaw.vout.find((o) => o.scriptPubKey.hex === spkHex);
       if (!vout) throw new Error('Could not find P2TR output');
       const destAddr = cli('getnewaddress "" bech32');
-      const destInfo = await rpcCall('getaddressinfo', [destAddr]) as { scriptPubKey: string };
+      const destInfo = (await rpcCall('getaddressinfo', [destAddr])) as { scriptPubKey: string };
       const destScriptPubKey = Buffer.from(destInfo.scriptPubKey, 'hex');
       const inputSats = BigInt(Math.round(vout.value * 1e8));
       const fee = 50000n; // 50k sats fee for large tx
       const outputSats = inputSats - fee;
-      const revealTxBytes = buildWitnessTx(
-        commitTxid, vout.n, destScriptPubKey, outputSats,
-        [taprootScript, controlBlock],
-      );
-      const txid = await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')]) as string;
+      const revealTxBytes = buildWitnessTx(commitTxid, vout.n, destScriptPubKey, outputSats, [
+        taprootScript,
+        controlBlock,
+      ]);
+      const txid = (await rpcCall('sendrawtransaction', [revealTxBytes.toString('hex')])) as string;
       mine(1);
       const doc = await tryFetchDoc(txid);
       expect(doc).not.toBeNull();
@@ -962,10 +1082,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     }, 120000);
 
     it('ADV-6: Binary garbage with CBOR content-type fails gracefully', async () => {
-      const garbage = Buffer.from(Array.from({ length: 256 }, () => Math.floor(Math.random() * 256)));
+      const garbage = Buffer.from(
+        Array.from({ length: 256 }, () => Math.floor(Math.random() * 256)),
+      );
       const txid = await inscribeRaw(garbage, 'application/atp.v1+cbor');
       // Extraction succeeds (finds inscription) but CBOR decode should fail
-      const tx = await rpcCall('getrawtransaction', [txid, true]) as {
+      const tx = (await rpcCall('getrawtransaction', [txid, true])) as {
         vin: Array<{ txinwitness?: string[] }>;
       };
       const witness = tx.vin[0]?.txinwitness!;
@@ -990,7 +1112,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-7: Signature swap — modified name after signing fails verification', async () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'OriginalName',
+        v: '1.0',
+        t: 'id',
+        n: 'OriginalName',
         k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: ts(),
       };
@@ -1013,7 +1137,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const { txid: txB } = await createAndInscribeIdentity(keyB, 'RealB');
       // Create attestation with wrong fingerprint in from.f
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'att',
+        v: '1.0',
+        t: 'att',
         from: { f: 'wrong-fingerprint-aaaa', ref: { net: NET, id: txA } },
         to: { f: keyB.fingerprint, ref: { net: NET, id: txB } },
         ts: ts(),
@@ -1035,9 +1160,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       await createAndInscribeIdentity(keyB, 'AttackerB');
       // B tries to revoke A
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'revoke',
+        v: '1.0',
+        t: 'revoke',
         target: { f: keyA.fingerprint, ref: { net: NET, id: txA } },
-        reason: 'defunct', ts: ts(),
+        reason: 'defunct',
+        ts: ts(),
       };
       RevocationUnsignedSchema.parse(doc);
       const sig = sign(doc, keyB.privateKey);
@@ -1057,10 +1184,13 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       await createAndInscribeIdentity(keyC, 'AttackerC');
       // C creates supersession targeting A but signs with C's key (not A's)
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'super',
+        v: '1.0',
+        t: 'super',
         target: { f: keyA.fingerprint, ref: { net: NET, id: txA } },
-        n: 'TargetA', k: [{ t: 'ed25519', p: keyNew.pubB64 }],
-        reason: 'key-rotation', ts: ts(),
+        n: 'TargetA',
+        k: [{ t: 'ed25519', p: keyNew.pubB64 }],
+        reason: 'key-rotation',
+        ts: ts(),
       };
       SupersessionUnsignedSchema.parse(doc);
       // Sign with C (old) and keyNew (new) — but C is NOT keyA
@@ -1083,7 +1213,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const key = makeKey();
       const futureTs = Math.floor(new Date('2050-01-01').getTime() / 1000);
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'FutureAgent',
+        v: '1.0',
+        t: 'id',
+        n: 'FutureAgent',
         k: [{ t: 'ed25519', p: key.pubB64 }],
         ts: futureTs,
       };
@@ -1101,8 +1233,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-12: Negative seq in heartbeat is rejected by schema', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'hb', f: key.fingerprint,
-        ref: { net: NET, id: 'abc123' }, seq: -1, ts: ts(),
+        v: '1.0',
+        t: 'hb',
+        f: key.fingerprint,
+        ref: { net: NET, id: 'abc123' },
+        seq: -1,
+        ts: ts(),
       };
       expect(() => HeartbeatUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1120,20 +1256,28 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       expect(verifyWithKey(hb1, key)).toBe(true);
       expect(verifyWithKey(hb2, key)).toBe(true);
       // hb1 was inscribed first
-      const raw1 = await rpcCall('getrawtransaction', [hb1Txid, true]) as { confirmations: number };
-      const raw2 = await rpcCall('getrawtransaction', [hb2Txid, true]) as { confirmations: number };
+      const raw1 = (await rpcCall('getrawtransaction', [hb1Txid, true])) as {
+        confirmations: number;
+      };
+      const raw2 = (await rpcCall('getrawtransaction', [hb2Txid, true])) as {
+        confirmations: number;
+      };
       expect(raw1.confirmations).toBeGreaterThan(raw2.confirmations);
     }, 60000);
 
-    it.todo('ADV-14: Self-referencing supersession (target fingerprint = new key fingerprint) — behavior undefined');
+    it.todo(
+      'ADV-14: Self-referencing supersession (target fingerprint = new key fingerprint) — behavior undefined',
+    );
 
     it('ADV-15: Revocation of non-existent identity TXID', async () => {
       const key = makeKey();
       const fakeTxid = 'deadbeef'.repeat(8); // 64-char fake txid
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'revoke',
+        v: '1.0',
+        t: 'revoke',
         target: { f: key.fingerprint, ref: { net: NET, id: fakeTxid } },
-        reason: 'defunct', ts: ts(),
+        reason: 'defunct',
+        ts: ts(),
       };
       RevocationUnsignedSchema.parse(doc);
       const sig = sign(doc, key.privateKey);
@@ -1151,9 +1295,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-16: Invalid CAIP-2 net string passes schema (no regex validation)', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'hb', f: key.fingerprint,
+        v: '1.0',
+        t: 'hb',
+        f: key.fingerprint,
         ref: { net: 'garbage!!!not-a-caip', id: 'abc123' },
-        seq: 0, ts: ts(),
+        seq: 0,
+        ts: ts(),
       };
       // Schema currently uses z.string() for net — no CAIP-2 validation
       // This is a gap: it SHOULD reject but currently doesn't
@@ -1170,9 +1317,12 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-17: Empty ref.id passes schema (no min-length validation)', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'hb', f: key.fingerprint,
+        v: '1.0',
+        t: 'hb',
+        f: key.fingerprint,
         ref: { net: NET, id: '' },
-        seq: 0, ts: ts(),
+        seq: 0,
+        ts: ts(),
       };
       const result = HeartbeatUnsignedSchema.safeParse(doc);
       if (!result.success) {
@@ -1185,7 +1335,8 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
 
     it('ADV-18: Attestation missing ref on from — schema rejects', () => {
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'att',
+        v: '1.0',
+        t: 'att',
         from: { f: 'some-fingerprint' }, // missing ref
         to: { f: 'other-fingerprint', ref: { net: NET, id: 'txid123' } },
         ts: ts(),
@@ -1198,8 +1349,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-19: Zero-length name rejected by schema', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: '',
-        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
+        v: '1.0',
+        t: 'id',
+        n: '',
+        k: [{ t: 'ed25519', p: key.pubB64 }],
+        ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1207,8 +1361,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-20: 65-char name rejected by schema', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'A'.repeat(65),
-        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
+        v: '1.0',
+        t: 'id',
+        n: 'A'.repeat(65),
+        k: [{ t: 'ed25519', p: key.pubB64 }],
+        ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1216,8 +1373,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-21: Unicode (Cyrillic) name rejected by ASCII-only schema', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'Ѕhrike', // Ѕ is Cyrillic
-        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
+        v: '1.0',
+        t: 'id',
+        n: 'Ѕhrike', // Ѕ is Cyrillic
+        k: [{ t: 'ed25519', p: key.pubB64 }],
+        ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow(/ASCII/i);
     });
@@ -1239,7 +1399,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const { txid: txB } = await createAndInscribeIdentity(keyB, 'AttesteeValid');
       // Build attestation with correct ref TXIDs
       const { txid: attTxid } = await createAndInscribeAttestation(
-        keyA, txA, keyB.fingerprint, txB, 'verified peer',
+        keyA,
+        txA,
+        keyB.fingerprint,
+        txB,
+        'verified peer',
       );
       const result = runVerify(attTxid);
       expect(result.exitCode).toBe(0);
@@ -1251,7 +1415,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
       const keyNew = makeKey();
       const { txid: idTxid } = await createAndInscribeIdentity(keyOld, 'SuperValid');
       const { txid: superTxid } = await createAndInscribeSupersession(
-        keyOld, idTxid, keyNew, 'SuperValid', 'key-rotation',
+        keyOld,
+        idTxid,
+        keyNew,
+        'SuperValid',
+        'key-rotation',
       );
       const result = runVerify(superTxid);
       expect(result.exitCode).toBe(0);
@@ -1261,8 +1429,11 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
     it('ADV-22: Null bytes in name rejected by ASCII-only schema', () => {
       const key = makeKey();
       const doc: Record<string, unknown> = {
-        v: '1.0', t: 'id', n: 'Agent\x00Evil',
-        k: [{ t: 'ed25519', p: key.pubB64 }], ts: ts(),
+        v: '1.0',
+        t: 'id',
+        n: 'Agent\x00Evil',
+        k: [{ t: 'ed25519', p: key.pubB64 }],
+        ts: ts(),
       };
       expect(() => IdentityUnsignedSchema.parse(doc)).toThrow();
     });
@@ -1271,7 +1442,9 @@ describe.skipIf(!bitcoindAvailable)('Regtest Integration', () => {
   it('9. Round-trip: document encoding preserved through inscription', async () => {
     const key = makeKey();
     const originalDoc: Record<string, unknown> = {
-      v: '1.0', t: 'id', n: 'EncodingTest-RoundTrip',
+      v: '1.0',
+      t: 'id',
+      n: 'EncodingTest-RoundTrip',
       k: [{ t: 'ed25519', p: key.pubB64 }],
       ts: ts(),
     };

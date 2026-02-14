@@ -27,7 +27,10 @@ export class MockChain {
   inscribe(data: Buffer, contentType = 'application/atp.v1+json'): string {
     const envelope = buildInscriptionEnvelope(data, contentType);
     const witnessHex = envelope.toString('hex');
-    const txid = createHash('sha256').update(data).update(String(Date.now() + Math.random())).digest('hex');
+    const txid = createHash('sha256')
+      .update(data)
+      .update(String(Date.now() + Math.random()))
+      .digest('hex');
 
     this.transactions.set(txid, {
       txid,

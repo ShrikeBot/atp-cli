@@ -3,7 +3,13 @@
  * Implements the explorer API spec in-memory with HTTP server.
  */
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
-import type { ExplorerIdentity, ExplorerChain, ChainEntry, ExplorerDocument, ExplorerInfo } from '../src/lib/explorer.js';
+import type {
+  ExplorerIdentity,
+  ExplorerChain,
+  ChainEntry,
+  ExplorerDocument,
+  ExplorerInfo,
+} from '../src/lib/explorer.js';
 
 interface StoredIdentity {
   genesis_fingerprint: string;
@@ -32,7 +38,7 @@ export class MockExplorer {
   /** Register an identity document. Returns a fake TXID. */
   addIdentity(doc: Record<string, unknown>): string {
     const k = doc.k as { t: string; p: string };
-    const fingerprint = doc.f as string || this.computeFp(k);
+    const fingerprint = (doc.f as string) || this.computeFp(k);
     const txid = this.fakeTxid();
     const block = this.nextBlock++;
 
@@ -140,9 +146,7 @@ export class MockExplorer {
 
   private getCurrentState(identity: StoredIdentity): { entry: ChainEntry; status: string } {
     const current = identity.chain[identity.chain.length - 1]!;
-    const status = identity.revocation
-      ? `revoked:${identity.revocation.reason}`
-      : 'active';
+    const status = identity.revocation ? `revoked:${identity.revocation.reason}` : 'active';
     return { entry: current, status };
   }
 

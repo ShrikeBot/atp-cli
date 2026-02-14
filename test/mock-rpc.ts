@@ -75,9 +75,11 @@ export class MockRPC {
           // Return a minimal tx structure with witness data
           return this.rpcResult(res, rpcReq.id, {
             txid: tx.txid,
-            vin: [{
-              txinwitness: [tx.witnessHex],
-            }],
+            vin: [
+              {
+                txinwitness: [tx.witnessHex],
+              },
+            ],
           });
         }
 
