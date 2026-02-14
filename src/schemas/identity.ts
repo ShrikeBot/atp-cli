@@ -1,25 +1,25 @@
-import { z } from 'zod';
-import { VersionSchema, TimestampSchema, KeySchema, SignatureObjectSchema } from './common.js';
+import { z } from "zod";
+import { VersionSchema, TimestampSchema, KeySchema, SignatureObjectSchema } from "./common.js";
 
 /** Structured metadata: named collections of key-value tuples */
 export const MetadataSchema = z
-  .record(z.string(), z.array(z.tuple([z.string(), z.string()])))
-  .optional();
+    .record(z.string(), z.array(z.tuple([z.string(), z.string()])))
+    .optional();
 
 export const IdentitySchema = z.object({
-  v: VersionSchema,
-  t: z.literal('id'),
-  n: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[\x20-\x7E]+$/, 'Name must be ASCII only (no Unicode homoglyphs)'),
-  k: z.array(KeySchema).min(1),
-  ts: TimestampSchema.optional(),
-  s: SignatureObjectSchema,
-  m: MetadataSchema,
-  sup: z.string().optional(),
-  vna: z.number().int().positive().optional(),
+    v: VersionSchema,
+    t: z.literal("id"),
+    n: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[\x20-\x7E]+$/, "Name must be ASCII only (no Unicode homoglyphs)"),
+    k: z.array(KeySchema).min(1),
+    ts: TimestampSchema.optional(),
+    s: SignatureObjectSchema,
+    m: MetadataSchema,
+    sup: z.string().optional(),
+    vna: z.number().int().positive().optional(),
 });
 
 /** Identity document without signature (for pre-sign validation) */
