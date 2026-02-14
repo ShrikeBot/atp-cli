@@ -83,6 +83,9 @@ export default tseslint.config(
             "func-name-matching": "error",
             "no-undef-init": "error",
             "block-scoped-var": "error",
+            "prefer-template": "error",
+            "prefer-object-spread": "error",
+            "no-else-return": "error",
 
             // === Async ===
             "require-await": "off", // too strict for CLI tool patterns

@@ -216,9 +216,9 @@ identity
         const sig = doc.s;
         if (sig && typeof sig === "object" && "f" in sig && "sig" in sig) {
             console.log(`Signer:      ${sig.f}`);
-            console.log(`Signature:   ${typeof sig.sig === "string" ? sig.sig.slice(0, 32) + "..." : "(binary)"}`);
+            console.log(`Signature:   ${typeof sig.sig === "string" ? `${sig.sig.slice(0, 32)}...` : "(binary)"}`);
         } else {
-            console.log(`Signature:   ${typeof sig === "string" ? sig.slice(0, 32) + "..." : "(binary)"}`);
+            console.log(`Signature:   ${typeof sig === "string" ? `${sig.slice(0, 32)}...` : "(binary)"}`);
         }
     });
 
