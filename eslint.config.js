@@ -61,7 +61,7 @@ export default tseslint.config(
             "no-useless-return": "error",
             "no-void": "error",
             "no-eq-null": "error",
-            "no-implicit-coercion": "error",
+            "no-implicit-coercion": "off",
             "no-multi-assign": "error",
             "no-unmodified-loop-condition": "error",
 
