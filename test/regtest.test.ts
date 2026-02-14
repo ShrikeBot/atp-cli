@@ -169,10 +169,7 @@ function computeTaprootOutput(script: Buffer): {
     // Use a deterministic "unspendable" internal key
     // This is the x-only key from hash of "TapTweak" with empty data
     // For simplicity, use a fixed known point on secp256k1
-    const internalKeyBytes = Buffer.from(
-        "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0",
-        "hex",
-    ); // NUMS point (x-only, 32 bytes)
+    const internalKeyBytes = Buffer.from("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0", "hex"); // NUMS point (x-only, 32 bytes)
 
     const leafHash = tapLeafHash(script);
 
@@ -180,9 +177,7 @@ function computeTaprootOutput(script: Buffer): {
     const tweak = taggedHash("TapTweak", internalKeyBytes, leafHash);
 
     // Tweaked key: P + t*G
-    const P = secp256k1.ProjectivePoint.fromHex(
-        Buffer.concat([Buffer.from([0x02]), internalKeyBytes]),
-    );
+    const P = secp256k1.ProjectivePoint.fromHex(Buffer.concat([Buffer.from([0x02]), internalKeyBytes]));
     const tweakScalar = BigInt("0x" + tweak.toString("hex"));
     const T = secp256k1.ProjectivePoint.BASE.multiply(tweakScalar);
     let Q = P.add(T);
@@ -483,9 +478,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         ]);
 
         // Broadcast reveal
-        const revealTxid = (await rpcCall("sendrawtransaction", [
-            revealTxBytes.toString("hex"),
-        ])) as string;
+        const revealTxid = (await rpcCall("sendrawtransaction", [revealTxBytes.toString("hex")])) as string;
         mine(1);
 
         return revealTxid;
@@ -691,15 +684,10 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         return verify(doc, key.publicKey, sigBytes);
     }
 
-    function verifySupersessionDoc(
-        doc: Record<string, unknown>,
-        oldKey: KeyPair,
-        newKey: KeyPair,
-    ): boolean {
+    function verifySupersessionDoc(doc: Record<string, unknown>, oldKey: KeyPair, newKey: KeyPair): boolean {
         const sigs = doc.s as Array<unknown>;
         return (
-            verify(doc, oldKey.publicKey, getSigBytes(sigs[0])) &&
-            verify(doc, newKey.publicKey, getSigBytes(sigs[1]))
+            verify(doc, oldKey.publicKey, getSigBytes(sigs[0])) && verify(doc, newKey.publicKey, getSigBytes(sigs[1]))
         );
     }
 
@@ -812,13 +800,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         const keyB = makeKey();
         const { txid: txA } = await createAndInscribeIdentity(keyA, "SuperAgent");
 
-        const { doc, txid } = await createAndInscribeSupersession(
-            keyA,
-            txA,
-            keyB,
-            "SuperAgent",
-            "key-rotation",
-        );
+        const { doc, txid } = await createAndInscribeSupersession(keyA, txA, keyB, "SuperAgent", "key-rotation");
 
         const fetched = await fetchDoc(txid);
         expect(fetched.t).toBe("super");
@@ -829,12 +811,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         const key = makeKey();
         const { txid: idTxid } = await createAndInscribeIdentity(key, "RevokeMe");
 
-        const { txid: revTxid } = await createAndInscribeRevocation(
-            key,
-            key.fingerprint,
-            idTxid,
-            "defunct",
-        );
+        const { txid: revTxid } = await createAndInscribeRevocation(key, key.fingerprint, idTxid, "defunct");
 
         const fetched = await fetchDoc(revTxid);
         expect(fetched.t).toBe("revoke");
@@ -885,28 +862,11 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
 
         // Build chain: A → B → C
         const { txid: txA } = await createAndInscribeIdentity(keyA, "PoisonAgent");
-        const { txid: txAB } = await createAndInscribeSupersession(
-            keyA,
-            txA,
-            keyB,
-            "PoisonAgent",
-            "key-rotation",
-        );
-        const { txid: txBC } = await createAndInscribeSupersession(
-            keyB,
-            txAB,
-            keyC,
-            "PoisonAgent",
-            "key-rotation",
-        );
+        const { txid: txAB } = await createAndInscribeSupersession(keyA, txA, keyB, "PoisonAgent", "key-rotation");
+        const { txid: txBC } = await createAndInscribeSupersession(keyB, txAB, keyC, "PoisonAgent", "key-rotation");
 
         // Revoke from genesis key A — kills entire chain
-        const { txid: revTxid } = await createAndInscribeRevocation(
-            keyA,
-            keyA.fingerprint,
-            txA,
-            "key-compromised",
-        );
+        const { txid: revTxid } = await createAndInscribeRevocation(keyA, keyA.fingerprint, txA, "key-compromised");
 
         const revDoc = await fetchDoc(revTxid);
         expect(revDoc.t).toBe("revoke");
@@ -951,8 +911,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         async function inscribeRaw(data: Buffer, contentType: string): Promise<string> {
             const envelope = buildRealInscriptionEnvelope(data, contentType);
             const taprootScript = Buffer.concat([envelope, Buffer.from([0x51])]);
-            const { outputKeyXOnly, controlBlock, scriptPubKey } =
-                computeTaprootOutput(taprootScript);
+            const { outputKeyXOnly, controlBlock, scriptPubKey } = computeTaprootOutput(taprootScript);
             const addr = p2trAddress(outputKeyXOnly);
             const commitTxid = cli(`sendtoaddress ${addr} 0.001`);
             mine(1);
@@ -974,9 +933,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
                 taprootScript,
                 controlBlock,
             ]);
-            const revealTxid = (await rpcCall("sendrawtransaction", [
-                revealTxBytes.toString("hex"),
-            ])) as string;
+            const revealTxid = (await rpcCall("sendrawtransaction", [revealTxBytes.toString("hex")])) as string;
             mine(1);
             return revealTxid;
         }
@@ -1057,8 +1014,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
             // Use higher fee for large tx (relay fee scales with size)
             const envelope = buildRealInscriptionEnvelope(data, "application/atp.v1+json");
             const taprootScript = Buffer.concat([envelope, Buffer.from([0x51])]);
-            const { outputKeyXOnly, controlBlock, scriptPubKey } =
-                computeTaprootOutput(taprootScript);
+            const { outputKeyXOnly, controlBlock, scriptPubKey } = computeTaprootOutput(taprootScript);
             const addr = p2trAddress(outputKeyXOnly);
             const commitTxid = cli(`sendtoaddress ${addr} 0.01`);
             mine(1);
@@ -1080,9 +1036,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
                 taprootScript,
                 controlBlock,
             ]);
-            const txid = (await rpcCall("sendrawtransaction", [
-                revealTxBytes.toString("hex"),
-            ])) as string;
+            const txid = (await rpcCall("sendrawtransaction", [revealTxBytes.toString("hex")])) as string;
             mine(1);
             const doc = await tryFetchDoc(txid);
             expect(doc).not.toBeNull();
@@ -1090,9 +1044,7 @@ describe.skipIf(!bitcoindAvailable)("Regtest Integration", () => {
         }, 120000);
 
         it("ADV-6: Binary garbage with CBOR content-type fails gracefully", async () => {
-            const garbage = Buffer.from(
-                Array.from({ length: 256 }, () => Math.floor(Math.random() * 256)),
-            );
+            const garbage = Buffer.from(Array.from({ length: 256 }, () => Math.floor(Math.random() * 256)));
             const txid = await inscribeRaw(garbage, "application/atp.v1+cbor");
             // Extraction succeeds (finds inscription) but CBOR decode should fail
             const tx = (await rpcCall("getrawtransaction", [txid, true])) as {

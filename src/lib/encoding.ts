@@ -120,9 +120,7 @@ export function encodeDocument(doc: Record<string, unknown>, format = "json"): B
         output = Buffer.from(JSON.stringify(sortKeys(doc), null, 2), "utf8");
     }
     if (output.length > MAX_DOCUMENT_SIZE) {
-        throw new Error(
-            `Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`,
-        );
+        throw new Error(`Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`);
     }
     return output;
 }

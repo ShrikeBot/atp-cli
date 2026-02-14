@@ -21,9 +21,7 @@ key.command("import")
         if (!opts.force) {
             try {
                 await access(keyFile);
-                console.error(
-                    `Error: Key ${keyData.fingerprint} already exists in store. Use --force to overwrite.`,
-                );
+                console.error(`Error: Key ${keyData.fingerprint} already exists in store. Use --force to overwrite.`);
                 process.exit(1);
             } catch {
                 // doesn't exist, good
@@ -62,9 +60,7 @@ key.command("export <fingerprint>")
         const keyFile = join(KEYS_DIR, `${fingerprint}.json`);
         const data = JSON.parse(await readFile(keyFile, "utf8"));
 
-        const keyBytes = opts.publicOnly
-            ? fromBase64url(data.publicKey)
-            : fromBase64url(data.privateKey);
+        const keyBytes = opts.publicOnly ? fromBase64url(data.publicKey) : fromBase64url(data.privateKey);
 
         switch (opts.format) {
             case "json":

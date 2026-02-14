@@ -30,10 +30,7 @@ interface ResolvedKey {
  * ref.id MUST be a valid TXID — no local file fallback.
  * Document references are attacker-controlled input; never treat them as file paths.
  */
-async function fetchDoc(
-    ref: { net: string; id: string },
-    rpcOpts: RpcOpts,
-): Promise<Record<string, unknown>> {
+async function fetchDoc(ref: { net: string; id: string }, rpcOpts: RpcOpts): Promise<Record<string, unknown>> {
     const id = ref.id;
     if (!/^[0-9a-f]{64}$/i.test(id)) {
         throw new Error(`Invalid TXID in document reference: '${id}'`);
@@ -69,10 +66,7 @@ async function fetchDoc(
  * Resolve a reference to an identity's public key (RPC-only).
  * Returns the key from the document at the given ref.
  */
-async function resolveIdentity(
-    ref: { net: string; id: string },
-    rpcOpts: RpcOpts,
-): Promise<ResolvedKey> {
+async function resolveIdentity(ref: { net: string; id: string }, rpcOpts: RpcOpts): Promise<ResolvedKey> {
     const doc = await fetchDoc(ref, rpcOpts);
     if (doc.t !== "id" && doc.t !== "super") {
         throw new Error(`Referenced document is type '${doc.t}', expected 'id' or 'super'`);
@@ -110,9 +104,7 @@ async function resolveCurrentKey(
 
     // Explorer says the current key is at this TXID — verify it on-chain
     const currentTxid = identity.ref.id;
-    console.log(
-        `  Explorer: current identity at ${currentTxid} (chain depth ${identity.chain_depth})`,
-    );
+    console.log(`  Explorer: current identity at ${currentTxid} (chain depth ${identity.chain_depth})`);
 
     // Fetch and verify the document from RPC (trust anchor)
     const doc = await fetchDoc({ net: identity.ref.net, id: currentTxid }, opts);
@@ -141,10 +133,7 @@ async function resolveCurrentKey(
  * Walk the full supersession chain via explorer, verifying each link on-chain.
  * Returns all chain keys (for revocation/att-revoke authority checks).
  */
-async function resolveChainKeys(
-    genesisFingerprint: string,
-    opts: VerifyOpts,
-): Promise<ResolvedKey[]> {
+async function resolveChainKeys(genesisFingerprint: string, opts: VerifyOpts): Promise<ResolvedKey[]> {
     if (!opts.explorerUrl) {
         throw new Error("Chain walking requires --explorer-url");
     }
@@ -155,10 +144,7 @@ async function resolveChainKeys(
     const keys: ResolvedKey[] = [];
     for (const entry of chain.chain) {
         // Verify each chain entry on-chain
-        const doc = await fetchDoc(
-            { net: "bip122:000000000019d6689c085ae165831e93", id: entry.inscription_id },
-            opts,
-        );
+        const doc = await fetchDoc({ net: "bip122:000000000019d6689c085ae165831e93", id: entry.inscription_id }, opts);
         const docKeys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
         const k = Array.isArray(docKeys) ? docKeys[0] : docKeys;
         const pubBytes = fromBase64url(k.p);
@@ -167,8 +153,7 @@ async function resolveChainKeys(
 
         if (fingerprint !== entry.fingerprint) {
             throw new Error(
-                `Chain entry claims fingerprint ${entry.fingerprint} ` +
-                    `but on-chain document has ${fingerprint}`,
+                `Chain entry claims fingerprint ${entry.fingerprint} but on-chain document has ${fingerprint}`,
             );
         }
         keys.push({ pubBytes, keyType, fingerprint });
@@ -260,9 +245,7 @@ const verifyCmd = new Command("verify")
                 validateTimestamp(doc.ts as number, "Document");
                 console.log(`Timestamp: ${new Date((doc.ts as number) * 1000).toISOString()} ✓`);
             } catch (e) {
-                console.error(
-                    `Warning: ${(e as Error).message} (ts is advisory — block time is authoritative)`,
-                );
+                console.error(`Warning: ${(e as Error).message} (ts is advisory — block time is authoritative)`);
             }
         } else {
             console.log(`Timestamp: not present (optional)`);
@@ -324,18 +307,10 @@ const verifyCmd = new Command("verify")
                             console.log(`  Fingerprint match: ✓`);
                         }
                         const sigBytes = typeof s.sig === "string" ? fromBase64url(s.sig) : s.sig;
-                        const valid = verify(
-                            doc,
-                            resolved.pubBytes,
-                            sigBytes,
-                            format,
-                            resolved.keyType,
-                        );
+                        const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                         sigValid("Signature", valid, resolved.fingerprint);
                     } catch (e) {
-                        console.error(
-                            `Error: could not resolve attestor's identity via ref: ${(e as Error).message}`,
-                        );
+                        console.error(`Error: could not resolve attestor's identity via ref: ${(e as Error).message}`);
                         process.exit(1);
                     }
                     break;
@@ -353,26 +328,16 @@ const verifyCmd = new Command("verify")
                         const resolved = await resolveIdentity(ref, verifyOpts);
                         console.log(`  Resolved identity: ${resolved.fingerprint}`);
                         if (f !== resolved.fingerprint) {
-                            console.error(
-                                `  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`,
-                            );
+                            console.error(`  ✗ Fingerprint mismatch: doc says ${f}, resolved ${resolved.fingerprint}`);
                             process.exit(1);
                         } else {
                             console.log(`  Fingerprint match: ✓`);
                         }
                         const sigBytes = typeof s.sig === "string" ? fromBase64url(s.sig) : s.sig;
-                        const valid = verify(
-                            doc,
-                            resolved.pubBytes,
-                            sigBytes,
-                            format,
-                            resolved.keyType,
-                        );
+                        const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                         sigValid("Signature", valid, resolved.fingerprint);
                     } catch (e) {
-                        console.error(
-                            `Error: could not resolve identity via ref: ${(e as Error).message}`,
-                        );
+                        console.error(`Error: could not resolve identity via ref: ${(e as Error).message}`);
                         process.exit(1);
                     }
                     break;
@@ -398,28 +363,14 @@ const verifyCmd = new Command("verify")
                             console.log(`  Target fingerprint match: ✓`);
                         }
                         const sigs = doc.s as Array<{ f: string; sig: string | Uint8Array }>;
-                        const oldSigBytes =
-                            typeof sigs[0].sig === "string"
-                                ? fromBase64url(sigs[0].sig)
-                                : sigs[0].sig;
-                        const newSigBytes =
-                            typeof sigs[1].sig === "string"
-                                ? fromBase64url(sigs[1].sig)
-                                : sigs[1].sig;
-                        const oldValid = verify(
-                            doc,
-                            oldKey.pubBytes,
-                            oldSigBytes,
-                            format,
-                            oldKey.keyType,
-                        );
+                        const oldSigBytes = typeof sigs[0].sig === "string" ? fromBase64url(sigs[0].sig) : sigs[0].sig;
+                        const newSigBytes = typeof sigs[1].sig === "string" ? fromBase64url(sigs[1].sig) : sigs[1].sig;
+                        const oldValid = verify(doc, oldKey.pubBytes, oldSigBytes, format, oldKey.keyType);
                         sigValid("Old key signature", oldValid, oldKey.fingerprint);
                         const newValid = verify(doc, newPubBytes, newSigBytes, format, k.t);
                         sigValid("New key signature", newValid, newFp);
                     } catch (e) {
-                        console.error(
-                            `Error: could not resolve old identity via target.ref: ${(e as Error).message}`,
-                        );
+                        console.error(`Error: could not resolve old identity via target.ref: ${(e as Error).message}`);
                         process.exit(1);
                     }
                     break;
@@ -434,13 +385,7 @@ const verifyCmd = new Command("verify")
                         const resolved = await resolveIdentity(target.ref, verifyOpts);
                         console.log(`  Resolved target identity: ${resolved.fingerprint}`);
                         const sigBytes = typeof s.sig === "string" ? fromBase64url(s.sig) : s.sig;
-                        const valid = verify(
-                            doc,
-                            resolved.pubBytes,
-                            sigBytes,
-                            format,
-                            resolved.keyType,
-                        );
+                        const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                         sigValid("Signature", valid, resolved.fingerprint);
                     } catch (e) {
                         console.error(
@@ -460,9 +405,7 @@ const verifyCmd = new Command("verify")
                         // Resolve the original attestation to find the attestor
                         const attDoc = await fetchDoc(ref, verifyOpts);
                         if (attDoc.t !== "att") {
-                            console.error(
-                                `  ✗ Referenced document is type '${attDoc.t}', expected 'att'`,
-                            );
+                            console.error(`  ✗ Referenced document is type '${attDoc.t}', expected 'att'`);
                             process.exit(1);
                         }
                         const from = attDoc.from as { f: string; ref: { net: string; id: string } };
@@ -475,13 +418,7 @@ const verifyCmd = new Command("verify")
                             const chainKeys = await resolveChainKeys(from.f, verifyOpts);
                             let matched = false;
                             for (const chainKey of chainKeys) {
-                                const valid = verify(
-                                    doc,
-                                    chainKey.pubBytes,
-                                    sigBytes,
-                                    format,
-                                    chainKey.keyType,
-                                );
+                                const valid = verify(doc, chainKey.pubBytes, sigBytes, format, chainKey.keyType);
                                 if (valid) {
                                     sigValid("Signature (chain key)", valid, chainKey.fingerprint);
                                     matched = true;
@@ -498,21 +435,13 @@ const verifyCmd = new Command("verify")
                             // No explorer — verify against the ref'd key only
                             const resolved = await resolveIdentity(from.ref, verifyOpts);
                             console.log(`  Resolved attestor identity: ${resolved.fingerprint}`);
-                            const valid = verify(
-                                doc,
-                                resolved.pubBytes,
-                                sigBytes,
-                                format,
-                                resolved.keyType,
-                            );
+                            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                             if (!valid) {
                                 console.error("  Signature does not match original attestor key.");
                                 console.error(
                                     "  Note: spec §4.6 allows successor keys in the supersession chain to revoke.",
                                 );
-                                console.error(
-                                    "  Full chain verification requires --explorer-url. Failing.",
-                                );
+                                console.error("  Full chain verification requires --explorer-url. Failing.");
                                 process.exit(1);
                             }
                             sigValid("Signature", valid, resolved.fingerprint);
@@ -556,13 +485,7 @@ const verifyCmd = new Command("verify")
                                     typeof sigs[i].sig === "string"
                                         ? fromBase64url(sigs[i].sig as string)
                                         : (sigs[i].sig as Uint8Array);
-                                const valid = verify(
-                                    doc,
-                                    resolved.pubBytes,
-                                    sigBytes,
-                                    format,
-                                    resolved.keyType,
-                                );
+                                const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
                                 sigValid(`  Party ${i} signature`, valid, resolved.fingerprint);
                             } catch (e) {
                                 console.error(

@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-    VersionSchema,
-    TimestampSchema,
-    ReferenceSchema,
-    KeySchema,
-    SignatureObjectSchema,
-} from "./common.js";
+import { VersionSchema, TimestampSchema, ReferenceSchema, KeySchema, SignatureObjectSchema } from "./common.js";
 import { MetadataSchema } from "./identity.js";
 
 export const SupersessionSchema = z.object({

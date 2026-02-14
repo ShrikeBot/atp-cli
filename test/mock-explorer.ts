@@ -64,11 +64,7 @@ export class MockExplorer {
     }
 
     /** Register a supersession. Links old fingerprint chain to new. */
-    addSupersession(
-        oldFingerprint: string,
-        newFingerprint: string,
-        doc: Record<string, unknown>,
-    ): string {
+    addSupersession(oldFingerprint: string, newFingerprint: string, doc: Record<string, unknown>): string {
         const identity = this.identities.get(oldFingerprint);
         if (!identity) throw new Error(`Identity ${oldFingerprint} not found`);
 

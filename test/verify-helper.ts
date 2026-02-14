@@ -45,20 +45,14 @@ export function verifyIdentity(doc: Record<string, unknown>): boolean {
 }
 
 /** Verify signature on a document signed by a known identity (attestation, heartbeat, att-revoke) */
-export function verifyWithIdentity(
-    doc: Record<string, unknown>,
-    identityDoc: Record<string, unknown>,
-): boolean {
+export function verifyWithIdentity(doc: Record<string, unknown>, identityDoc: Record<string, unknown>): boolean {
     const { pubBytes } = getPubKeyFromIdentity(identityDoc);
     const sigBytes = getSigBytes(doc.s);
     return verify(doc, pubBytes, sigBytes);
 }
 
 /** Verify a supersession document (needs both old and new key) */
-export function verifySupersession(
-    doc: Record<string, unknown>,
-    oldIdentityDoc: Record<string, unknown>,
-): boolean {
+export function verifySupersession(doc: Record<string, unknown>, oldIdentityDoc: Record<string, unknown>): boolean {
     const { pubBytes: oldPub } = getPubKeyFromIdentity(oldIdentityDoc);
     const kRaw = doc.k;
     const newK = (Array.isArray(kRaw) ? kRaw[0] : kRaw) as { t: string; p: string };
@@ -70,10 +64,7 @@ export function verifySupersession(
 }
 
 /** Verify a revocation - signer must be any key in the supersession chain */
-export function verifyRevocation(
-    doc: Record<string, unknown>,
-    signerIdentityDoc: Record<string, unknown>,
-): boolean {
+export function verifyRevocation(doc: Record<string, unknown>, signerIdentityDoc: Record<string, unknown>): boolean {
     const { pubBytes } = getPubKeyFromIdentity(signerIdentityDoc);
     const sigBytes = getSigBytes(doc.s);
     return verify(doc, pubBytes, sigBytes);

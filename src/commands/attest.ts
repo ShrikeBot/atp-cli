@@ -15,11 +15,7 @@ const attest = new Command("attest")
     .requiredOption("--from-txid <txid>", "Your identity inscription TXID")
     .requiredOption("--to-txid <txid>", "Target identity inscription TXID")
     .option("--net <caip2>", "CAIP-2 network identifier", BITCOIN_MAINNET)
-    .option(
-        "--stake <sats>",
-        "Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)",
-        parseInt,
-    )
+    .option("--stake <sats>", "Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)", parseInt)
     .option("--claim <type>", "Claim type: identity, capability, reliability", "identity")
     .option("--context <text>", "Context/reason for attestation")
     .option("--encoding <format>", "json or cbor", "json")

@@ -45,8 +45,7 @@ export async function generateKeypair(
     if (keyType !== "ed25519" && keyType !== "secp256k1") {
         throw new Error(`Key type "${keyType}" not yet supported. Use ed25519 or secp256k1.`);
     }
-    const { privateKey, publicKey } =
-        keyType === "secp256k1" ? generateSecp256k1() : generateEd25519();
+    const { privateKey, publicKey } = keyType === "secp256k1" ? generateSecp256k1() : generateEd25519();
     const fingerprint = computeFingerprint(publicKey, keyType);
 
     await ensureKeysDir();
@@ -94,10 +93,7 @@ export async function loadPrivateKeyByFile(filePath: string): Promise<KeyData> {
  * - base64url string
  * - JSON file with a `privateKey` field (base64url)
  */
-export async function loadPrivateKeyFromFile(
-    filePath: string,
-    keyType = "ed25519",
-): Promise<KeyData> {
+export async function loadPrivateKeyFromFile(filePath: string, keyType = "ed25519"): Promise<KeyData> {
     const raw = await readFile(filePath);
 
     let privBytes: Buffer;
@@ -132,9 +128,7 @@ export async function loadPrivateKeyFromFile(
                 try {
                     privBytes = fromBase64url(text);
                     if (privBytes.length !== 32) {
-                        throw new Error(
-                            `Decoded key is ${privBytes.length} bytes, expected 32 for Ed25519`,
-                        );
+                        throw new Error(`Decoded key is ${privBytes.length} bytes, expected 32 for Ed25519`);
                     }
                 } catch {
                     throw new Error(
@@ -220,11 +214,7 @@ export async function loadPublicKeyFromFile(
 /**
  * Save a keypair to ~/.atp/keys/
  */
-export async function saveKeypair(
-    privateKey: Buffer,
-    publicKey: Buffer,
-    keyType = "ed25519",
-): Promise<string> {
+export async function saveKeypair(privateKey: Buffer, publicKey: Buffer, keyType = "ed25519"): Promise<string> {
     const fingerprint = computeFingerprint(publicKey, keyType);
     await ensureKeysDir();
     const keyFile = join(KEYS_DIR, `${fingerprint}.json`);

@@ -8,12 +8,7 @@ function detectKeyType(doc: Record<string, unknown>): string {
     return k?.t ?? "ed25519";
 }
 
-export function sign(
-    doc: Record<string, unknown>,
-    privateKey: Uint8Array,
-    format = "json",
-    keyType?: string,
-): Buffer {
+export function sign(doc: Record<string, unknown>, privateKey: Uint8Array, format = "json", keyType?: string): Buffer {
     const type = keyType ?? detectKeyType(doc);
     const bytes = encodeForSigning(doc, format);
 

@@ -38,10 +38,7 @@ describe("key commands", () => {
         // Write hex format key file
         await writeFile(join(tmpDir, "test.hex"), privateKey.toString("hex"));
         // Write JSON format key file
-        await writeFile(
-            join(tmpDir, "test.json"),
-            JSON.stringify({ privateKey: toBase64url(privateKey) }),
-        );
+        await writeFile(join(tmpDir, "test.json"), JSON.stringify({ privateKey: toBase64url(privateKey) }));
         // Clean up any existing key with this fingerprint
         try {
             await rm(join(KEYS_DIR, `${fingerprint}.json`));

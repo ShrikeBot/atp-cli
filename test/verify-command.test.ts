@@ -272,11 +272,7 @@ describe("Verify command", () => {
                 { f: oldKey.fingerprint, sig: toBase64url(sign(superDoc, oldKey.privateKey)) },
                 { f: newKey.fingerprint, sig: toBase64url(sign(superDoc, newKey.privateKey)) },
             ];
-            const out = await runVerify(
-                writeDoc("super-exp.json", superDoc),
-                rpc.url,
-                explorer.url,
-            );
+            const out = await runVerify(writeDoc("super-exp.json", superDoc), rpc.url, explorer.url);
             expect(out).toContain("✓ VALID");
             expect(out).toContain("Chain state verified via explorer");
         });
@@ -418,11 +414,7 @@ describe("Verify command", () => {
                 ts: ts(),
             };
             attRev.s = { f: keyNew.fingerprint, sig: toBase64url(sign(attRev, keyNew.privateKey)) };
-            const out = await runVerify(
-                writeDoc("attrev-chain.json", attRev),
-                rpc.url,
-                explorer.url,
-            );
+            const out = await runVerify(writeDoc("attrev-chain.json", attRev), rpc.url, explorer.url);
             expect(out).toContain("✓ VALID");
             expect(out).toContain("chain key");
             expect(out).toContain("Chain state verified via explorer");

@@ -14,8 +14,7 @@ import {
 
 const FAKE_FP = "erAHnt8G_oV4ANOborNzsAm2qSG_ikaQGA5cLpz8nVQ";
 const FAKE_PUB = "WhIcbyU-rzgEPkPr8mFPTyEhBpmDpz877NS_UGaOi4k";
-const FAKE_SIG =
-    "NHDEGlU4HW5C54b5OWP8s_esxb3A2OQ594Cz3AW9pNYdVRB6hF2j8prlefrZYAwfe2gkhRieEXhzXDRZ0WrGAw";
+const FAKE_SIG = "NHDEGlU4HW5C54b5OWP8s_esxb3A2OQ594Cz3AW9pNYdVRB6hF2j8prlefrZYAwfe2gkhRieEXhzXDRZ0WrGAw";
 const NOW = Math.floor(Date.now() / 1000);
 const FAKE_REF = { net: BITCOIN_MAINNET, id: "a".repeat(64) };
 

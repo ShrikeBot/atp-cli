@@ -1,12 +1,7 @@
 import { validateTimestamp } from "../lib/timestamp.js";
 import { Command } from "commander";
 import { readFile, writeFile } from "node:fs/promises";
-import {
-    generateKeypair,
-    loadPrivateKeyFromFile,
-    loadPublicKeyFromFile,
-    saveKeypair,
-} from "../lib/keys.js";
+import { generateKeypair, loadPrivateKeyFromFile, loadPublicKeyFromFile, saveKeypair } from "../lib/keys.js";
 import { computeFingerprint } from "../lib/fingerprint.js";
 import { toBase64url, fromBase64url, encodeDocument } from "../lib/encoding.js";
 import { sign } from "../lib/signing.js";
@@ -112,9 +107,7 @@ identity
             if (opts.publicKey) {
                 const pubData = await loadPublicKeyFromFile(opts.publicKey as string, keyType);
                 if (!pubData.publicKey.equals(publicKey)) {
-                    console.error(
-                        "Error: --public-key does not match the public key derived from --private-key",
-                    );
+                    console.error("Error: --public-key does not match the public key derived from --private-key");
                     process.exit(1);
                 }
             }
@@ -212,9 +205,7 @@ identity
 
         if (doc.m) {
             console.log(`Metadata:`);
-            for (const [collection, entries] of Object.entries(
-                doc.m as Record<string, [string, string][]>,
-            )) {
+            for (const [collection, entries] of Object.entries(doc.m as Record<string, [string, string][]>)) {
                 console.log(`  ${collection}:`);
                 for (const [key, value] of entries) {
                     console.log(`    ${key}: ${value}`);
@@ -225,13 +216,9 @@ identity
         const sig = doc.s;
         if (sig && typeof sig === "object" && "f" in sig && "sig" in sig) {
             console.log(`Signer:      ${sig.f}`);
-            console.log(
-                `Signature:   ${typeof sig.sig === "string" ? sig.sig.slice(0, 32) + "..." : "(binary)"}`,
-            );
+            console.log(`Signature:   ${typeof sig.sig === "string" ? sig.sig.slice(0, 32) + "..." : "(binary)"}`);
         } else {
-            console.log(
-                `Signature:   ${typeof sig === "string" ? sig.slice(0, 32) + "..." : "(binary)"}`,
-            );
+            console.log(`Signature:   ${typeof sig === "string" ? sig.slice(0, 32) + "..." : "(binary)"}`);
         }
     });
 

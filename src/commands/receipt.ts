@@ -164,9 +164,7 @@ receipt
                 resolved.keyType,
             );
             if (!valid) {
-                console.error(
-                    `Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`,
-                );
+                console.error(`Error: party ${i} (${parties[i].role}) signature is INVALID — refusing to countersign`);
                 process.exit(1);
             }
             console.error(`Party ${i} (${parties[i].role}) signature: ✓ VALID`);

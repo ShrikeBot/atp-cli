@@ -1,10 +1,5 @@
 import { z } from "zod";
-import {
-    VersionSchema,
-    TimestampSchema,
-    LocationRefSchema,
-    SignatureObjectSchema,
-} from "./common.js";
+import { VersionSchema, TimestampSchema, LocationRefSchema, SignatureObjectSchema } from "./common.js";
 
 export const HeartbeatSchema = z.object({
     v: VersionSchema,
