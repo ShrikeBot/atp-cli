@@ -243,3 +243,141 @@ describe("AtpDocumentSchema (discriminated union)", () => {
         expect(() => AtpDocumentSchema.parse(doc)).not.toThrow();
     });
 });
+
+describe("Name charset validation", () => {
+    const makeId = (n: string) => ({
+        v: "1.0" as const,
+        t: "id" as const,
+        n,
+        k: [{ t: "ed25519", p: FAKE_PUB }],
+        ts: NOW,
+        s: { f: FAKE_FP, sig: FAKE_SIG },
+    });
+
+    it("accepts alphanumeric names", () => {
+        expect(() => IdentitySchema.parse(makeId("Agent42"))).not.toThrow();
+    });
+
+    it("accepts names with space, underscore, hyphen, dot", () => {
+        expect(() => IdentitySchema.parse(makeId("My Agent_v1-test.2"))).not.toThrow();
+    });
+
+    it("accepts single character name", () => {
+        expect(() => IdentitySchema.parse(makeId("A"))).not.toThrow();
+    });
+
+    it("accepts exactly 64 character name", () => {
+        expect(() => IdentitySchema.parse(makeId("a".repeat(64)))).not.toThrow();
+    });
+
+    it("rejects angle brackets", () => {
+        expect(() => IdentitySchema.parse(makeId("Agent<script>"))).toThrow();
+    });
+
+    it("rejects pipe character", () => {
+        expect(() => IdentitySchema.parse(makeId("Agent|test"))).toThrow();
+    });
+
+    it("rejects backtick", () => {
+        expect(() => IdentitySchema.parse(makeId("Agent`test"))).toThrow();
+    });
+
+    it("rejects quotes", () => {
+        expect(() => IdentitySchema.parse(makeId('Agent"test'))).toThrow();
+        expect(() => IdentitySchema.parse(makeId("Agent'test"))).toThrow();
+    });
+
+    it("rejects backslash", () => {
+        expect(() => IdentitySchema.parse(makeId("Agent\\test"))).toThrow();
+    });
+
+    it("rejects @#$%^&*", () => {
+        for (const ch of ["@", "#", "$", "%", "^", "&", "*"]) {
+            expect(() => IdentitySchema.parse(makeId(`Agent${ch}test`))).toThrow();
+        }
+    });
+
+    it("rejects empty string", () => {
+        expect(() => IdentitySchema.parse(makeId(""))).toThrow();
+    });
+});
+
+describe("k field must be array", () => {
+    it("rejects k as single object", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "id" as const,
+            n: "Test",
+            k: { t: "ed25519", p: FAKE_PUB },
+            ts: NOW,
+            s: { f: FAKE_FP, sig: FAKE_SIG },
+        };
+        expect(() => IdentitySchema.parse(doc)).toThrow();
+    });
+});
+
+describe("Attestation spec compliance", () => {
+    it("rejects stake field", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "att" as const,
+            from: { f: FAKE_FP, ref: FAKE_REF },
+            to: { f: FAKE_FP, ref: FAKE_REF },
+            ts: NOW,
+            stake: 10000,
+        };
+        // stake is not in schema, strict parsing should ignore it (passthrough)
+        // but it should not be a recognized field
+        const parsed = AttestationUnsignedSchema.parse(doc);
+        expect(parsed).not.toHaveProperty("stake");
+    });
+
+    it("accepts vna field", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "att" as const,
+            from: { f: FAKE_FP, ref: FAKE_REF },
+            to: { f: FAKE_FP, ref: FAKE_REF },
+            ts: NOW,
+            vna: NOW + 86400,
+        };
+        expect(() => AttestationUnsignedSchema.parse(doc)).not.toThrow();
+    });
+
+    it("rejects exp field (deprecated)", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "att" as const,
+            from: { f: FAKE_FP, ref: FAKE_REF },
+            to: { f: FAKE_FP, ref: FAKE_REF },
+            ts: NOW,
+            exp: NOW + 86400,
+        };
+        const parsed = AttestationUnsignedSchema.parse(doc);
+        expect(parsed).not.toHaveProperty("exp");
+    });
+});
+
+describe("Supersession reason values", () => {
+    const makeSuper = (reason: string) => ({
+        v: "1.0" as const,
+        t: "super" as const,
+        target: { f: FAKE_FP, ref: FAKE_REF },
+        n: "Test",
+        k: [{ t: "ed25519", p: FAKE_PUB }],
+        reason,
+        ts: NOW,
+    });
+
+    it("accepts key-addition", () => {
+        expect(() => SupersessionUnsignedSchema.parse(makeSuper("key-addition"))).not.toThrow();
+    });
+
+    it("accepts key-removal", () => {
+        expect(() => SupersessionUnsignedSchema.parse(makeSuper("key-removal"))).not.toThrow();
+    });
+
+    it("rejects unknown reason", () => {
+        expect(() => SupersessionUnsignedSchema.parse(makeSuper("bored"))).toThrow();
+    });
+});

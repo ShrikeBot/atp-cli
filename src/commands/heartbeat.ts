@@ -19,7 +19,8 @@ const heartbeat = new Command("heartbeat")
     .option("--output <file>", "Output file")
     .action(async (opts: Record<string, string | undefined>) => {
         const fromDoc = JSON.parse(await readFile(opts.from!, "utf8"));
-        const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
+        if (!Array.isArray(fromDoc.k)) throw new Error("k field must be an array");
+        const fromK = fromDoc.k[0];
         const fromPub = fromBase64url(fromK.p);
         const fp = computeFingerprint(fromPub, fromK.t);
         const net = opts.net ?? BITCOIN_MAINNET;

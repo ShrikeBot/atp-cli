@@ -68,7 +68,8 @@ const supersede = new Command("supersede")
     .option("--output <file>", "Output file")
     .action(async (opts: Record<string, string | undefined>) => {
         const oldDoc = JSON.parse(await readFile(opts.old!, "utf8"));
-        const oldK = (Array.isArray(oldDoc.k) ? oldDoc.k : [oldDoc.k])[0];
+        if (!Array.isArray(oldDoc.k)) throw new Error("k field must be an array");
+        const oldK = oldDoc.k[0];
         const oldPub = fromBase64url(oldK.p);
         const oldFp = computeFingerprint(oldPub, oldK.t);
         const net = opts.net ?? BITCOIN_MAINNET;

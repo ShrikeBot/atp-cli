@@ -11,7 +11,7 @@ describe("Signing and Verification", () => {
             v: "1.0" as const,
             t: "id",
             n: "TestAgent",
-            k: { t: "ed25519", p: toBase64url(publicKey) },
+            k: [{ t: "ed25519", p: toBase64url(publicKey) }],
             ts: Math.floor(Date.now() / 1000),
         };
 
@@ -29,7 +29,7 @@ describe("Signing and Verification", () => {
             v: "1.0" as const,
             t: "id",
             n: "TestAgent",
-            k: { t: "ed25519", p: toBase64url(publicKey) },
+            k: [{ t: "ed25519", p: toBase64url(publicKey) }],
             ts: Math.floor(Date.now() / 1000),
         };
 
@@ -46,7 +46,7 @@ describe("Signing and Verification", () => {
             v: "1.0" as const,
             t: "id",
             n: "Alice",
-            k: { t: "ed25519", p: toBase64url(alice.publicKey) },
+            k: [{ t: "ed25519", p: toBase64url(alice.publicKey) }],
             ts: Math.floor(Date.now() / 1000),
         };
 
@@ -61,7 +61,7 @@ describe("Signing and Verification", () => {
             v: "1.0" as const,
             t: "id",
             n: "TestAgent",
-            k: { t: "ed25519", p: toBase64url(publicKey) },
+            k: [{ t: "ed25519", p: toBase64url(publicKey) }],
             ts: Math.floor(Date.now() / 1000),
         };
 
@@ -76,7 +76,7 @@ describe("Signing and Verification", () => {
             v: "1.0" as const,
             t: "id",
             n: "TestAgent",
-            k: { t: "ed25519", p: toBase64url(publicKey) },
+            k: [{ t: "ed25519", p: toBase64url(publicKey) }],
             ts: Math.floor(Date.now() / 1000),
         };
 

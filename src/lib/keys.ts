@@ -79,7 +79,8 @@ export async function loadPrivateKey(fingerprint: string): Promise<KeyData> {
 export async function loadPrivateKeyByFile(filePath: string): Promise<KeyData> {
     const doc = JSON.parse(await readFile(filePath, "utf8"));
     const k = doc.k;
-    const keyObj = Array.isArray(k) ? k[0] : k;
+    if (!Array.isArray(k)) throw new Error("k field must be an array");
+    const keyObj = k[0];
     const pubBytes = fromBase64url(keyObj.p);
     const keyType: string = keyObj.t;
     const fp = computeFingerprint(pubBytes, keyType);
@@ -105,7 +106,8 @@ export async function loadPrivateKeyFromFile(filePath: string, keyType = "ed2551
             privBytes = fromBase64url(json.privateKey);
         } else if (json.k) {
             // It's an identity file – delegate to existing loader
-            const keyObj = Array.isArray(json.k) ? json.k[0] : json.k;
+            if (!Array.isArray(json.k)) throw new Error("k field must be an array");
+            const keyObj = json.k[0];
             const pubBytes = fromBase64url(keyObj.p);
             const fp = computeFingerprint(pubBytes, keyObj.t);
             return loadPrivateKey(fp);
@@ -175,7 +177,8 @@ export async function loadPublicKeyFromFile(
         if (json.publicKey) {
             pubBytes = fromBase64url(json.publicKey);
         } else if (json.k) {
-            const keyObj = Array.isArray(json.k) ? json.k[0] : json.k;
+            if (!Array.isArray(json.k)) throw new Error("k field must be an array");
+            const keyObj = json.k[0];
             pubBytes = fromBase64url(keyObj.p);
         } else {
             throw new Error('JSON key file must have a "publicKey" field');

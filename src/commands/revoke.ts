@@ -20,7 +20,8 @@ const revoke = new Command("revoke")
     .option("--output <file>", "Output file")
     .action(async (opts: Record<string, string | undefined>) => {
         const idDoc = JSON.parse(await readFile(opts.identity!, "utf8"));
-        const k = (Array.isArray(idDoc.k) ? idDoc.k : [idDoc.k])[0];
+        if (!Array.isArray(idDoc.k)) throw new Error("k field must be an array");
+        const k = idDoc.k[0];
         const pubBytes = fromBase64url(k.p);
         const fp = computeFingerprint(pubBytes, k.t);
         const net = opts.net ?? BITCOIN_MAINNET;

@@ -27,7 +27,8 @@ receipt
     .option("--output <file>", "Output file")
     .action(async (opts: Record<string, string | number | undefined>) => {
         const fromDoc = JSON.parse(await readFile(opts.from as string, "utf8"));
-        const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
+        if (!Array.isArray(fromDoc.k)) throw new Error("k field must be an array");
+        const fromK = fromDoc.k[0];
         const fromPub = fromBase64url(fromK.p);
         const fromFp = computeFingerprint(fromPub, fromK.t);
         const net = (opts.net as string) ?? BITCOIN_MAINNET;
@@ -107,7 +108,8 @@ receipt
 
         // Load our identity to find which party we are
         const myDoc = JSON.parse(await readFile(opts.identity!, "utf8"));
-        const myK = (Array.isArray(myDoc.k) ? myDoc.k : [myDoc.k])[0];
+        if (!Array.isArray(myDoc.k)) throw new Error("k field must be an array");
+        const myK = myDoc.k[0];
         const myPub = fromBase64url(myK.p);
         const myFp = computeFingerprint(myPub, myK.t);
 

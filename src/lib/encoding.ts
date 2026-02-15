@@ -108,8 +108,18 @@ export function encodeForSigning(doc: Record<string, unknown>, format = "json"):
     return Buffer.concat([separator, jsonCanonical(unsigned)]);
 }
 
-/** Maximum encoded document size (16 KB) */
-const MAX_DOCUMENT_SIZE = 16384;
+/** Tiered document size limits (bytes) */
+const SIZE_LIMITS: Record<string, number> = {
+    pub: 512 * 1024,
+    id: 128 * 1024,
+    super: 128 * 1024,
+    rcpt: 64 * 1024,
+    att: 16 * 1024,
+    revoke: 16 * 1024,
+    "att-revoke": 16 * 1024,
+    hb: 16 * 1024,
+};
+const DEFAULT_SIZE_LIMIT = 16 * 1024;
 
 /** Encode complete document */
 export function encodeDocument(doc: Record<string, unknown>, format = "json"): Buffer {
@@ -119,8 +129,10 @@ export function encodeDocument(doc: Record<string, unknown>, format = "json"): B
     } else {
         output = Buffer.from(JSON.stringify(sortKeys(doc), null, 2), "utf8");
     }
-    if (output.length > MAX_DOCUMENT_SIZE) {
-        throw new Error(`Document exceeds maximum size: ${output.length} bytes (limit: ${MAX_DOCUMENT_SIZE})`);
+    const docType = (doc.t as string) || "";
+    const limit = SIZE_LIMITS[docType] ?? DEFAULT_SIZE_LIMIT;
+    if (output.length > limit) {
+        throw new Error(`Document exceeds maximum size: ${output.length} bytes (limit: ${limit} for type "${docType}")`);
     }
     return output;
 }

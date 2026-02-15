@@ -11,7 +11,7 @@ export const IdentitySchema = z.object({
         .string()
         .min(1)
         .max(64)
-        .regex(/^[\x20-\x7E]+$/, "Name must be ASCII only (no Unicode homoglyphs)"),
+        .regex(/^[a-zA-Z0-9 _\-.]+$/, "Name must contain only alphanumeric, space, underscore, hyphen, dot"),
     k: z.array(KeySchema).min(1),
     ts: TimestampSchema.optional(),
     s: SignatureObjectSchema,

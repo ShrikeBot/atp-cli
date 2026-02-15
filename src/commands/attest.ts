@@ -15,14 +15,14 @@ const attest = new Command("attest")
     .requiredOption("--from-txid <txid>", "Your identity inscription TXID")
     .requiredOption("--to-txid <txid>", "Target identity inscription TXID")
     .option("--net <caip2>", "CAIP-2 network identifier", BITCOIN_MAINNET)
-    .option("--stake <sats>", "Sats staked to protocol treasury (bc1q6z4rlakqvsfzmfp3304wfl364rugsjxcj6wleg)", parseInt)
     .option("--claim <type>", "Claim type: identity, capability, reliability", "identity")
     .option("--context <text>", "Context/reason for attestation")
     .option("--encoding <format>", "json or cbor", "json")
     .option("--output <file>", "Output file")
     .action(async (fingerprint: string, opts: Record<string, string | number | undefined>) => {
         const fromDoc = JSON.parse(await readFile(opts.from as string, "utf8"));
-        const fromK = (Array.isArray(fromDoc.k) ? fromDoc.k : [fromDoc.k])[0];
+        if (!Array.isArray(fromDoc.k)) throw new Error("k field must be an array");
+        const fromK = fromDoc.k[0];
         const fromPub = fromBase64url(fromK.p);
         const fromFp = computeFingerprint(fromPub, fromK.t);
         const net = (opts.net as string) ?? BITCOIN_MAINNET;
@@ -36,9 +36,6 @@ const attest = new Command("attest")
         };
         validateTimestamp(doc.ts as number, "Attestation");
 
-        if (opts.stake) {
-            doc.stake = opts.stake;
-        }
         if (opts.context) {
             doc.ctx = opts.context;
         }

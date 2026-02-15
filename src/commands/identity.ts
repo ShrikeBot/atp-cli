@@ -192,7 +192,8 @@ identity
         console.log(`Version:     ${doc.v}`);
         console.log(`Type:        ${doc.t}`);
 
-        const keys = Array.isArray(doc.k) ? doc.k : [doc.k];
+        if (!Array.isArray(doc.k)) throw new Error("k field must be an array");
+        const keys = doc.k;
         for (let i = 0; i < keys.length; i++) {
             const k = keys[i];
             const pubBytes = fromBase64url(k.p);

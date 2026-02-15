@@ -8,9 +8,8 @@ export const AttestationSchema = z.object({
     to: ReferenceSchema,
     ts: TimestampSchema.optional(),
     s: SignatureObjectSchema,
-    stake: z.number().optional(),
     ctx: z.string().optional(),
-    exp: z.number().optional(),
+    vna: z.number().int().positive().optional(),
 });
 
 export const AttestationUnsignedSchema = AttestationSchema.omit({ s: true });

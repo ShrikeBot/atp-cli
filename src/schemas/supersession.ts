@@ -10,10 +10,10 @@ export const SupersessionSchema = z.object({
         .string()
         .min(1)
         .max(64)
-        .regex(/^[\x20-\x7E]+$/, "Name must be ASCII only"),
+        .regex(/^[a-zA-Z0-9 _\-.]+$/, "Name must contain only alphanumeric, space, underscore, hyphen, dot"),
     k: z.array(KeySchema).min(1),
     m: MetadataSchema,
-    reason: z.enum(["key-rotation", "algorithm-upgrade", "key-compromised", "metadata-update"]),
+    reason: z.enum(["key-rotation", "algorithm-upgrade", "key-compromised", "metadata-update", "key-addition", "key-removal"]),
     ts: TimestampSchema.optional(),
     s: z.array(SignatureObjectSchema).length(2),
     vnb: z.number().int().positive().optional(),
