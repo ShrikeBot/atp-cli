@@ -447,8 +447,7 @@ describe("Verify command", () => {
             };
             attRev.s = { f: keyNew.fingerprint, sig: toBase64url(sign(attRev, keyNew.privateKey)) };
             const out = await runVerify(writeDoc("attrev-noexp.json", attRev), rpc.url);
-            expect(out).toContain("does not match original attestor key");
-            expect(out).toContain("requires --explorer-url");
+            expect(out).toContain("does not match any key in key set");
         });
     });
 
