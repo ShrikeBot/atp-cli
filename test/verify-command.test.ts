@@ -70,6 +70,19 @@ function buildIdDoc(key: KeyPair, name: string): Record<string, unknown> {
     return doc;
 }
 
+/** Build multi-key identity doc — signs with signKey (must be in keys array) */
+function buildMultiKeyIdDoc(keys: KeyPair[], signKey: KeyPair, name: string): Record<string, unknown> {
+    const doc: Record<string, unknown> = {
+        v: "1.0",
+        t: "id",
+        n: name,
+        k: keys.map((k) => ({ t: "ed25519", p: k.pubB64 })),
+        ts: ts(),
+    };
+    doc.s = { f: signKey.fingerprint, sig: toBase64url(sign(doc, signKey.privateKey)) };
+    return doc;
+}
+
 describe("Verify command", () => {
     let rpc: MockRPC;
     let explorer: MockExplorer;
@@ -514,6 +527,281 @@ describe("Verify command", () => {
             const out = await runVerify(writeDoc("rcpt-exp.json", rcpt), rpc.url, explorer.url);
             expect(out).toContain("✓ VALID");
             expect(out).toContain("Chain state verified via explorer");
+        });
+    });
+
+    // ── Multi-key identity verification ──
+
+    describe("multi-key identity", () => {
+        it("verifies identity signed by k[1]", async () => {
+            const k0 = makeKey();
+            const k1 = makeKey();
+            const doc = buildMultiKeyIdDoc([k0, k1], k1, "MultiKeyAgent");
+            const out = await runVerify(writeDoc("id-mk.json", doc), rpc.url);
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(k1.fingerprint);
+        });
+
+        it("rejects identity when s.f matches no key in k[]", async () => {
+            const k0 = makeKey();
+            const rogue = makeKey();
+            const doc: Record<string, unknown> = {
+                v: "1.0",
+                t: "id",
+                n: "RogueAgent",
+                k: [{ t: "ed25519", p: k0.pubB64 }],
+                ts: ts(),
+            };
+            doc.s = { f: rogue.fingerprint, sig: toBase64url(sign(doc, rogue.privateKey)) };
+            const out = await runVerify(writeDoc("id-rogue.json", doc), rpc.url);
+            expect(out).toContain("does not match any key");
+        });
+
+        it("verifies attestation signed by k[1] of multi-key attestor", async () => {
+            const k0 = makeKey();
+            const k1 = makeKey();
+            const target = makeKey();
+
+            const idDoc = buildMultiKeyIdDoc([k0, k1], k0, "MultiKeyAttestor");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const att: Record<string, unknown> = {
+                v: "1.0",
+                t: "att",
+                from: { f: k0.fingerprint, ref: { net: NET, id: idTxid } },
+                to: { f: target.fingerprint, ref: { net: NET, id: "a".repeat(64) } },
+                ts: ts(),
+            };
+            // Sign with k[1], set s.f to k[1]'s fingerprint
+            att.s = { f: k1.fingerprint, sig: toBase64url(sign(att, k1.privateKey)) };
+            const out = await runVerify(writeDoc("att-mk.json", att), rpc.url);
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(k1.fingerprint);
+        });
+
+        it("rejects attestation when s.f not in attestor key set", async () => {
+            const k0 = makeKey();
+            const rogue = makeKey();
+            const target = makeKey();
+
+            const idDoc = buildIdDoc(k0, "SingleKeyAttestor");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const att: Record<string, unknown> = {
+                v: "1.0",
+                t: "att",
+                from: { f: k0.fingerprint, ref: { net: NET, id: idTxid } },
+                to: { f: target.fingerprint, ref: { net: NET, id: "b".repeat(64) } },
+                ts: ts(),
+            };
+            att.s = { f: rogue.fingerprint, sig: toBase64url(sign(att, rogue.privateKey)) };
+            const out = await runVerify(writeDoc("att-rogue.json", att), rpc.url);
+            expect(out).toContain("does not match any key in key set");
+        });
+
+        it("verifies heartbeat signed by k[1] of multi-key identity", async () => {
+            const k0 = makeKey();
+            const k1 = makeKey();
+
+            const idDoc = buildMultiKeyIdDoc([k0, k1], k0, "MultiKeyHB");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const hb: Record<string, unknown> = {
+                v: "1.0",
+                t: "hb",
+                f: k0.fingerprint,
+                ref: { net: NET, id: idTxid },
+                seq: 0,
+                ts: ts(),
+            };
+            hb.s = { f: k1.fingerprint, sig: toBase64url(sign(hb, k1.privateKey)) };
+            const out = await runVerify(writeDoc("hb-mk.json", hb), rpc.url);
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(k1.fingerprint);
+        });
+
+        it("verifies supersession with s[0] from old k[1] and s[1] from new k[1]", async () => {
+            const oldK0 = makeKey();
+            const oldK1 = makeKey();
+            const newK0 = makeKey();
+            const newK1 = makeKey();
+
+            const idDoc = buildMultiKeyIdDoc([oldK0, oldK1], oldK0, "MultiKeySuper");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const superDoc: Record<string, unknown> = {
+                v: "1.0",
+                t: "super",
+                target: { f: oldK0.fingerprint, ref: { net: NET, id: idTxid } },
+                n: "MultiKeySuper",
+                k: [
+                    { t: "ed25519", p: newK0.pubB64 },
+                    { t: "ed25519", p: newK1.pubB64 },
+                ],
+                reason: "key-rotation",
+                ts: ts(),
+            };
+            // s[0] signed by old k[1], s[1] signed by new k[1]
+            superDoc.s = [
+                { f: oldK1.fingerprint, sig: toBase64url(sign(superDoc, oldK1.privateKey)) },
+                { f: newK1.fingerprint, sig: toBase64url(sign(superDoc, newK1.privateKey)) },
+            ];
+            const out = await runVerify(writeDoc("super-mk.json", superDoc), rpc.url);
+            expect(out).toContain("Old key signature");
+            expect(out).toContain("New key signature");
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(oldK1.fingerprint);
+            expect(out).toContain(newK1.fingerprint);
+        });
+
+        it("rejects supersession when s[0].f not in old key set", async () => {
+            const oldK0 = makeKey();
+            const newK0 = makeKey();
+            const rogue = makeKey();
+
+            const idDoc = buildIdDoc(oldK0, "SuperRejectOld");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const superDoc: Record<string, unknown> = {
+                v: "1.0",
+                t: "super",
+                target: { f: oldK0.fingerprint, ref: { net: NET, id: idTxid } },
+                n: "SuperRejectOld",
+                k: [{ t: "ed25519", p: newK0.pubB64 }],
+                reason: "key-rotation",
+                ts: ts(),
+            };
+            superDoc.s = [
+                { f: rogue.fingerprint, sig: toBase64url(sign(superDoc, rogue.privateKey)) },
+                { f: newK0.fingerprint, sig: toBase64url(sign(superDoc, newK0.privateKey)) },
+            ];
+            const out = await runVerify(writeDoc("super-rogue-old.json", superDoc), rpc.url);
+            expect(out).toContain("does not match any key in key set");
+        });
+
+        it("rejects supersession when s[1].f not in new key set", async () => {
+            const oldK0 = makeKey();
+            const newK0 = makeKey();
+            const rogue = makeKey();
+
+            const idDoc = buildIdDoc(oldK0, "SuperRejectNew");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const superDoc: Record<string, unknown> = {
+                v: "1.0",
+                t: "super",
+                target: { f: oldK0.fingerprint, ref: { net: NET, id: idTxid } },
+                n: "SuperRejectNew",
+                k: [{ t: "ed25519", p: newK0.pubB64 }],
+                reason: "key-rotation",
+                ts: ts(),
+            };
+            superDoc.s = [
+                { f: oldK0.fingerprint, sig: toBase64url(sign(superDoc, oldK0.privateKey)) },
+                { f: rogue.fingerprint, sig: toBase64url(sign(superDoc, rogue.privateKey)) },
+            ];
+            const out = await runVerify(writeDoc("super-rogue-new.json", superDoc), rpc.url);
+            expect(out).toContain("does not match any key in key set");
+        });
+
+        it("verifies revocation signed by k[1] of multi-key target", async () => {
+            const k0 = makeKey();
+            const k1 = makeKey();
+
+            const idDoc = buildMultiKeyIdDoc([k0, k1], k0, "MultiKeyRevoke");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const rev: Record<string, unknown> = {
+                v: "1.0",
+                t: "revoke",
+                target: { f: k0.fingerprint, ref: { net: NET, id: idTxid } },
+                reason: "key-compromised",
+                ts: ts(),
+            };
+            rev.s = { f: k1.fingerprint, sig: toBase64url(sign(rev, k1.privateKey)) };
+            const out = await runVerify(writeDoc("revoke-mk.json", rev), rpc.url);
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(k1.fingerprint);
+        });
+
+        it("rejects revocation when s.f not in target key set (no explorer)", async () => {
+            const k0 = makeKey();
+            const rogue = makeKey();
+
+            const idDoc = buildIdDoc(k0, "RevokeReject");
+            const idTxid = rpc.addInscription(idDoc);
+
+            const rev: Record<string, unknown> = {
+                v: "1.0",
+                t: "revoke",
+                target: { f: k0.fingerprint, ref: { net: NET, id: idTxid } },
+                reason: "key-compromised",
+                ts: ts(),
+            };
+            rev.s = { f: rogue.fingerprint, sig: toBase64url(sign(rev, rogue.privateKey)) };
+            const out = await runVerify(writeDoc("revoke-rogue.json", rev), rpc.url);
+            expect(out).toContain("does not match any key");
+        });
+
+        it("rejects receipt when s.length !== p.length", async () => {
+            const keyA = makeKey();
+            const keyB = makeKey();
+
+            const idA = buildIdDoc(keyA, "RcptMismatchA");
+            const idATxid = rpc.addInscription(idA);
+            const idB = buildIdDoc(keyB, "RcptMismatchB");
+            const idBTxid = rpc.addInscription(idB);
+
+            const rcpt: Record<string, unknown> = {
+                v: "1.0",
+                t: "rcpt",
+                p: [
+                    { f: keyA.fingerprint, ref: { net: NET, id: idATxid }, role: "initiator" },
+                    { f: keyB.fingerprint, ref: { net: NET, id: idBTxid }, role: "counterparty" },
+                ],
+                ex: { type: "exchange", sum: "Test" },
+                out: "completed",
+                ts: ts(),
+            };
+            // Only one signature for two parties
+            rcpt.s = [
+                { f: keyA.fingerprint, sig: toBase64url(sign(rcpt, keyA.privateKey)) },
+            ];
+            const out = await runVerify(writeDoc("rcpt-mismatch.json", rcpt), rpc.url);
+            expect(out).toContain("Signature count");
+            expect(out).toContain("does not match party count");
+        });
+
+        it("verifies receipt where party signs with k[1]", async () => {
+            const kA0 = makeKey();
+            const kA1 = makeKey();
+            const kB = makeKey();
+
+            const idA = buildMultiKeyIdDoc([kA0, kA1], kA0, "RcptMultiA");
+            const idATxid = rpc.addInscription(idA);
+            const idB = buildIdDoc(kB, "RcptMultiB");
+            const idBTxid = rpc.addInscription(idB);
+
+            const rcpt: Record<string, unknown> = {
+                v: "1.0",
+                t: "rcpt",
+                p: [
+                    { f: kA0.fingerprint, ref: { net: NET, id: idATxid }, role: "initiator" },
+                    { f: kB.fingerprint, ref: { net: NET, id: idBTxid }, role: "counterparty" },
+                ],
+                ex: { type: "exchange", sum: "Multi-key receipt" },
+                out: "completed",
+                ts: ts(),
+            };
+            // Party A signs with k[1], party B signs with their only key
+            rcpt.s = [
+                { f: kA1.fingerprint, sig: toBase64url(sign(rcpt, kA1.privateKey)) },
+                { f: kB.fingerprint, sig: toBase64url(sign(rcpt, kB.privateKey)) },
+            ];
+            const out = await runVerify(writeDoc("rcpt-mk.json", rcpt), rpc.url);
+            expect(out).toContain("✓ VALID");
+            expect(out).toContain(kA1.fingerprint);
+            expect(out).not.toContain("✗ INVALID");
         });
     });
 
