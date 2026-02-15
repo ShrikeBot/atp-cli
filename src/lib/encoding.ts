@@ -40,7 +40,7 @@ export { cborDecode };
 const DOMAIN_SEPARATOR = Buffer.from("ATP-v1.0:", "ascii");
 
 /** Known binary fields that must be byte strings in CBOR */
-const BINARY_FIELDS = new Set(["p", "s", "f"]);
+const BINARY_FIELDS = new Set(["p", "sig", "f"]);
 
 /** Convert known binary fields from base64url strings to Buffers for CBOR encoding */
 export function binaryFieldsToBuffers(obj: unknown): unknown {

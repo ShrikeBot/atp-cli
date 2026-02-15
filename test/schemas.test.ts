@@ -13,6 +13,7 @@ import {
 } from "../src/schemas/index.js";
 
 const FAKE_FP = "erAHnt8G_oV4ANOborNzsAm2qSG_ikaQGA5cLpz8nVQ";
+const FAKE_FP2 = "xK3jL9mN1qQ9pE4tU6u1fGRjwNWwtnQd4fG4eISeI6s";
 const FAKE_PUB = "WhIcbyU-rzgEPkPr8mFPTyEhBpmDpz877NS_UGaOi4k";
 const FAKE_SIG = "NHDEGlU4HW5C54b5OWP8s_esxb3A2OQ594Cz3AW9pNYdVRB6hF2j8prlefrZYAwfe2gkhRieEXhzXDRZ0WrGAw";
 const NOW = Math.floor(Date.now() / 1000);
@@ -183,7 +184,7 @@ describe("Receipt Schema", () => {
             t: "rcpt" as const,
             p: [
                 { f: FAKE_FP, ref: FAKE_REF, role: "initiator" },
-                { f: FAKE_FP, ref: FAKE_REF, role: "counterparty" },
+                { f: FAKE_FP2, ref: FAKE_REF, role: "counterparty" },
             ],
             ex: { type: "service", sum: "Test exchange" },
             out: "completed",
@@ -355,6 +356,70 @@ describe("Attestation spec compliance", () => {
         };
         const parsed = AttestationUnsignedSchema.parse(doc);
         expect(parsed).not.toHaveProperty("exp");
+    });
+});
+
+describe("Duplicate key detection", () => {
+    it("rejects identity with duplicate public keys in k array", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "id" as const,
+            n: "DupKeys",
+            k: [
+                { t: "ed25519", p: FAKE_PUB },
+                { t: "ed25519", p: FAKE_PUB },
+            ],
+            ts: NOW,
+            s: { f: FAKE_FP, sig: FAKE_SIG },
+        };
+        expect(() => IdentitySchema.parse(doc)).toThrow(/uplicate/);
+    });
+
+    it("accepts identity with distinct keys", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "id" as const,
+            n: "MultiKey",
+            k: [
+                { t: "ed25519", p: FAKE_PUB },
+                { t: "ed25519", p: "aBtxA94XweOEmkvNbrfw-KGbLA1OX2p7jJ0OHyoLTF0" },
+            ],
+            ts: NOW,
+            s: { f: FAKE_FP, sig: FAKE_SIG },
+        };
+        expect(() => IdentitySchema.parse(doc)).not.toThrow();
+    });
+});
+
+describe("Receipt party uniqueness", () => {
+    it("rejects receipt with duplicate party fingerprints (self-dealing)", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "rcpt" as const,
+            p: [
+                { f: FAKE_FP, ref: FAKE_REF, role: "buyer" },
+                { f: FAKE_FP, ref: FAKE_REF, role: "seller" },
+            ],
+            ex: { type: "trade", sum: "Invalid" },
+            out: "completed" as const,
+            ts: NOW,
+        };
+        expect(() => ReceiptUnsignedSchema.parse(doc)).toThrow(/uplicate|self-dealing/);
+    });
+
+    it("accepts receipt with distinct parties", () => {
+        const doc = {
+            v: "1.0" as const,
+            t: "rcpt" as const,
+            p: [
+                { f: FAKE_FP, ref: FAKE_REF, role: "buyer" },
+                { f: FAKE_FP2, ref: FAKE_REF, role: "seller" },
+            ],
+            ex: { type: "trade", sum: "Valid" },
+            out: "completed" as const,
+            ts: NOW,
+        };
+        expect(() => ReceiptUnsignedSchema.parse(doc)).not.toThrow();
     });
 });
 

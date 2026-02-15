@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { readFile } from "node:fs/promises";
-import { fromBase64url, cborDecode } from "../lib/encoding.js";
+import { fromBase64url, cborDecode, buffersToBase64url } from "../lib/encoding.js";
 import { verify } from "../lib/signing.js";
 import { computeFingerprint } from "../lib/fingerprint.js";
 import { BitcoinRPC } from "../lib/rpc.js";
@@ -57,7 +57,8 @@ async function fetchDoc(ref: { net: string; id: string }, rpcOpts: RpcOpts): Pro
     }
     const { contentType, data } = extracted;
     if (contentType.includes("cbor")) {
-        return cborDecode(data) as Record<string, unknown>;
+        // Normalize CBOR byte strings back to base64url for schema compatibility
+        return buffersToBase64url(cborDecode(data)) as Record<string, unknown>;
     }
     return JSON.parse(data.toString("utf8"));
 }
@@ -71,8 +72,11 @@ async function resolveIdentity(ref: { net: string; id: string }, rpcOpts: RpcOpt
     if (doc.t !== "id" && doc.t !== "super") {
         throw new Error(`Referenced document is type '${doc.t}', expected 'id' or 'super'`);
     }
-    const keys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
-    const k = Array.isArray(keys) ? keys[0] : keys;
+    // Schema-validate referenced docs (enforces k-array, name charset, etc.)
+    AtpDocumentSchema.parse(doc);
+    const keys = doc.k as Array<{ t: string; p: string }>;
+    if (!Array.isArray(keys)) throw new Error("Referenced document k field must be an array");
+    const k = keys[0];
     const pubBytes = fromBase64url(k.p);
     const keyType = k.t;
     const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -111,9 +115,11 @@ async function resolveCurrentKey(
     if (doc.t !== "id" && doc.t !== "super") {
         throw new Error(`Explorer pointed to document type '${doc.t}', expected 'id' or 'super'`);
     }
+    AtpDocumentSchema.parse(doc);
 
-    const keys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
-    const k = Array.isArray(keys) ? keys[0] : keys;
+    const keys = doc.k as Array<{ t: string; p: string }>;
+    if (!Array.isArray(keys)) throw new Error("Referenced document k field must be an array");
+    const k = keys[0];
     const pubBytes = fromBase64url(k.p);
     const keyType = k.t;
     const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -145,8 +151,10 @@ async function resolveChainKeys(genesisFingerprint: string, opts: VerifyOpts): P
     for (const entry of chain.chain) {
         // Verify each chain entry on-chain
         const doc = await fetchDoc({ net: "bip122:000000000019d6689c085ae165831e93", id: entry.inscription_id }, opts);
-        const docKeys = doc.k as Array<{ t: string; p: string }> | { t: string; p: string };
-        const k = Array.isArray(docKeys) ? docKeys[0] : docKeys;
+        AtpDocumentSchema.parse(doc);
+        const docKeys = doc.k as Array<{ t: string; p: string }>;
+        if (!Array.isArray(docKeys)) throw new Error("Chain entry k field must be an array");
+        const k = docKeys[0];
         const pubBytes = fromBase64url(k.p);
         const keyType = k.t;
         const fingerprint = computeFingerprint(pubBytes, keyType);
@@ -215,7 +223,7 @@ const verifyCmd = new Command("verify")
             const { contentType, data } = extracted;
             format = contentType.includes("cbor") ? "cbor" : "json";
             if (format === "cbor") {
-                doc = cborDecode(data) as Record<string, unknown>;
+                doc = buffersToBase64url(cborDecode(data)) as Record<string, unknown>;
             } else {
                 doc = JSON.parse(data.toString("utf8"));
             }
@@ -280,12 +288,8 @@ const verifyCmd = new Command("verify")
                         }
                     }
                     if (!matched) {
-                        // Fallback: try first key
-                        const k = keys[0];
-                        const pubBytes = fromBase64url(k.p);
-                        const fp = computeFingerprint(pubBytes, k.t);
-                        const valid = verify(doc, pubBytes, sigBytes, format);
-                        sigValid("Signature", valid, fp);
+                        console.error(`  ✗ s.f '${s.f}' does not match any key in k array`);
+                        process.exit(1);
                     }
                     break;
                 }
@@ -382,11 +386,53 @@ const verifyCmd = new Command("verify")
                     console.log(`  Revocation of ${target.f}`);
                     console.log(`  Reason: ${doc.reason}`);
                     try {
+                        // Verify target.f matches the resolved identity
                         const resolved = await resolveIdentity(target.ref, verifyOpts);
                         console.log(`  Resolved target identity: ${resolved.fingerprint}`);
+                        if (target.f !== resolved.fingerprint) {
+                            console.error(
+                                `  ✗ Target fingerprint mismatch: doc says ${target.f}, resolved ${resolved.fingerprint}`,
+                            );
+                            process.exit(1);
+                        } else {
+                            console.log(`  Target fingerprint match: ✓`);
+                        }
+
                         const sigBytes = typeof s.sig === "string" ? fromBase64url(s.sig) : s.sig;
-                        const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
-                        sigValid("Signature", valid, resolved.fingerprint);
+
+                        // Check if s.f matches the resolved (target ref) key
+                        if (s.f === resolved.fingerprint) {
+                            const valid = verify(doc, resolved.pubBytes, sigBytes, format, resolved.keyType);
+                            sigValid("Signature", valid, resolved.fingerprint);
+                        } else if (hasExplorer) {
+                            // s.f doesn't match target ref key — walk supersession chain (poison pill)
+                            console.log(`  s.f '${s.f}' differs from target key — walking chain...`);
+                            const chainKeys = await resolveChainKeys(target.f, verifyOpts);
+                            let matched = false;
+                            for (const chainKey of chainKeys) {
+                                if (chainKey.fingerprint === s.f) {
+                                    const valid = verify(doc, chainKey.pubBytes, sigBytes, format, chainKey.keyType);
+                                    sigValid("Signature (chain key)", valid, chainKey.fingerprint);
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            if (!matched) {
+                                console.error(
+                                    "  ✗ s.f does not match any key in the identity's supersession chain.",
+                                );
+                                process.exit(1);
+                            }
+                        } else {
+                            // No explorer and s.f doesn't match — can't verify chain authority
+                            console.error(
+                                `  ✗ s.f '${s.f}' does not match target key '${resolved.fingerprint}'.`,
+                            );
+                            console.error(
+                                "  Full chain verification requires --explorer-url.",
+                            );
+                            process.exit(1);
+                        }
                     } catch (e) {
                         console.error(
                             `Error: could not resolve target identity via target.ref: ${(e as Error).message}`,
